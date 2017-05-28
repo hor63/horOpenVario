@@ -1,0 +1,4 @@
+sd.img
+build/kernel4
+build/root/*
+build/ubuntu/*

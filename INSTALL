@@ -1,0 +1,20 @@
+Installation Instructions
+*************************
+
+#    This file is part of horOpenVario 
+#    Copyright (C) 2017  Kai Horstmann <horstmannkai@hotmail.com>
+#
+
+Basic Installation
+==================
+
+   First checkout all submodules running "git submodule init; git submodule update"
+
+   Basically run the script "makenewimage.sh" in this directory.
+This will create and update the image file sd.img in this directory.
+Copy the image onto your micro-SD card with "dd if=sd.img of=<SDDev> bs=1M"
+<SDDev> is the name of your SD card raw device, e.g. /dev/sdc
+
+This creates a bootable SD card for your Cubieboard which will run the Ubuntu 16.04 LTS installer upon first startup.
+It is sufficient to select basic software at the end of the Ubuntu installation process on the SD card.
+Further steps are explained in the README contained in setup-ubuntu.tgz in the /boot directory after the installation.
