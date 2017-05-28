@@ -43,6 +43,41 @@ read x
 echo "Hit enter to continue"
 read x
 
+(cd build/ubuntu/
+ echo "Fetch the Ubuntu net installer initrd"
+ if [ -f initrd.gz ]
+ then
+   echo "Installer is already here. Do you want to download again? [yN]"
+   read x
+   if [ "$x" -eq "Y" -o "$x" -eq "y" ]
+   then
+     rm initrd.gz
+   fi
+ fi
+
+ if [ -f initrd.gz ]
+ then
+   echo "initrd.gz is retained"
+ else
+   echo "Download initrd.gz"
+   wget "http://ports.ubuntu.com/ubuntu-ports/dists/xenial/main/installer-armhf/current/images/generic/netboot/initrd.gz"
+ fi
+)
+
+echo "Hit enter to continue"
+read x
+
+(cd build/ubuntu/
+ echo "Unpack the Ubuntu net installer initrd"
+ sudo rm -rf initrd.dir
+ mkdir initrd.dir
+ cd initrd.dir
+ gunzip < ../initrd.gz |sudo cpio -idmu
+)
+
+echo "Hit enter to continue"
+read x
+
 (cd build/ubuntu/initrd.dir/lib/modules
  echo "copy the modules into the initrd tree"
  sudo rm -rf 3.4.*
