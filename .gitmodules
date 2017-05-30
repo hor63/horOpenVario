@@ -1,3 +1,27 @@
 [submodule "src/kernel"]
 	path = src/kernel
 	url = https://github.com/hor63/horOpenVario-src-kernel.git
+
+[submodule "src/sunxi-boards"]
+	path = src/sunxi-boards
+	url = git://github.com/linux-sunxi/sunxi-boards.git
+
+[submodule "src/sunxi-tools"]
+	path = src/sunxi-tools
+	url = git://github.com/linux-sunxi/sunxi-tools.git
+
+[submodule "src/sunxi-uboot"]
+	path = src/sunxi-uboot
+	url = https://github.com/linux-sunxi/u-boot-sunxi.git
+
+[submodule "src/uboot-mainline"]
+	path = src/uboot-mainline
+	url = https://github.com/hor63/horOpenVario-src-uboot.git
+
+[submodule "build/boot"]
+	path = build/boot
+	url = https://github.com/hor63/horOpenVario-build-boot.git
+
+[submodule "src/rtl8188C_8192C_usb_linux_v4.0.2_9000.20130911"]
+	path = src/rtl8188C_8192C_usb_linux_v4.0.2_9000.20130911
+	url = https://github.com/hor63/horOpenVario-src-rtl8188C_8192C_usb_linux.git
