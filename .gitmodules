@@ -25,3 +25,9 @@
 [submodule "src/rtl8188C_8192C_usb_linux_v4.0.2_9000.20130911"]
 	path = src/rtl8188C_8192C_usb_linux_v4.0.2_9000.20130911
 	url = https://github.com/hor63/horOpenVario-src-rtl8188C_8192C_usb_linux.git
+[submodule "mali"]
+	path = setup-ubuntu/mali/mali
+	url = https://github.com/hor63/sunxi-mali-1.git
+[submodule "libump"]
+	path = setup-ubuntu/mali/ump/libump
+	url = https://github.com/hor63/libump.git
