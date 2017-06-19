@@ -10,7 +10,7 @@
 
 ( cd src/sunxi-tools
   echo "rebuild fex compiler"
-  make fexc bin2fex fex2bin || exit 1
+  make bin2fex fex2bin || exit 1
 ) || exit 1  
 
 echo "Hit enter to continue"
