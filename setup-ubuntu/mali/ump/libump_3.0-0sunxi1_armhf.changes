@@ -1,0 +1,30 @@
+Format: 1.8
+Date: Tue, 22 Oct 2013 17:31:32 +0200
+Source: libump
+Binary: libump libump-dbg libump-dev
+Architecture: armhf
+Version: 3.0-0sunxi1
+Distribution: any
+Urgency: low
+Maintainer: Luc Verhaegen <libv@skynet.be>
+Changed-By: Luc Verhaegen <libv@skynet.be>
+Description:
+ libump     - ARM Unified Memory Provider library
+ libump-dbg - ARM Unified Memory Provider library (debugging symbols)
+ libump-dev - ARM Unified Memory Provider library (development files)
+Changes:
+ libump (3.0-0sunxi1) any; urgency=low
+ .
+   * add udev file.
+Checksums-Sha1:
+ 5c67f9bc30dd83d2d49b9bc4a2cd6cbed5d8e040 11120 libump_3.0-0sunxi1_armhf.deb
+ 60613f40656d53b2ddab709a83e9098c4807554d 34080 libump-dbg_3.0-0sunxi1_armhf.deb
+ 2bb55c0050779ca0ddd6d36ccb92a1fc70f66882 14252 libump-dev_3.0-0sunxi1_armhf.deb
+Checksums-Sha256:
+ 52a46a3b48337910fe3dc66958111153c231341ee5872ff1f1b786bd6bd3de01 11120 libump_3.0-0sunxi1_armhf.deb
+ 3e68756a92feb3ed82c9cc69d3133c11a745dcfdae33650d12cb0536677f3153 34080 libump-dbg_3.0-0sunxi1_armhf.deb
+ d01536023400461576f3ba3866990e62ae896186b89506f23ecacfb7523161d8 14252 libump-dev_3.0-0sunxi1_armhf.deb
+Files:
+ efe1e9066cc46c018610bc10e23ebf2d 11120 libs optional libump_3.0-0sunxi1_armhf.deb
+ 38dcf23609f1730af509449dad4ba14a 34080 debug extra libump-dbg_3.0-0sunxi1_armhf.deb
+ 07a1defb3b98345b57beaf9d79984c23 14252 libdevel optional libump-dev_3.0-0sunxi1_armhf.deb

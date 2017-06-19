@@ -1,0 +1,16 @@
+g++ bison flex gcc binutils git subversion libz-dev smbclient gawk autoconf autogen expect automake perl python imagemagick libinput-dev make build-essential
+cifs-utils
+libtool
+debhelper dh-autoreconf pkg-config
+libudev-dev
+libfreetype6-dev libpng-dev libjpeg-dev libcurl4-openssl-dev libxml-parser-perl librsvg2-bin xsltproc gettext fonts-dejavu
+u-boot-tools
+iw wpasupplicant wireless-tools
+ntp ntp-doc rdate fake-hwclock
+i2c-tools libi2c-dev python-smbus
+libtiff5-dev
+liblua5.2-dev
+libgeotiff-dev
+ffmpeg quilt lynx 
+libasound2-dev
+nfs-common nfs4-acl-tools nfs-kernel-server
