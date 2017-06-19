@@ -112,6 +112,8 @@ read x
  cp -v uInitrdNoinst  ../boot || exit 1
 ) || exit 1
 
+echo "Hit enter to continue"
+read x
 
 echo "make boot script image"  
 ( cd build/boot ; mkimage -A arm -T script -C none -d boot.cmd boot.scr 
@@ -122,6 +124,10 @@ echo "make boot script image"
     echo "Make boot script $s from $i"
     mkimage -A arm -T script -C none -d $i $s || exit 1
   done  )
+
+echo "Hit enter to continue"
+read x
+
 echo "compile FEX file to script.bin"
 ( 
   cd build/boot ; ../../src/sunxi-tools/fex2bin -v openvario.fex script.bin  || exit 1
@@ -130,14 +136,20 @@ echo "compile FEX file to script.bin"
 
 echo "Hit enter to continue"
 read x
+
+echo "Copy Ubuntu installation instructions and support files to build/boot/setup-ubuntu.tgz" 
+tar -czf build/boot/setup-ubuntu.tgz setup-ubuntu/
+
+echo "Hit enter to continue"
+read x
 echo "Create and partition the SD image"
-dd if=/dev/zero of=sd.img bs=1M count=110 || exit 1
+dd if=/dev/zero of=sd.img bs=1M count=210 || exit 1
 echo "o
 n
 p
 1
 2048
-+100M
++200M
 p
 w
 q" | fdisk sd.img || exit 1
@@ -166,4 +178,3 @@ sudo losetup
 echo "Copy the SD card image \"sd.img\" to the SD card raw device"  
 # cp -v sd.img /mnt/hgfs/D/Users/kai_horstmann/Downloads/Cubieboard/
 echo " ----------------- Done -------------------------"
-
