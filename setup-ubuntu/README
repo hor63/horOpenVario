@@ -1,4 +1,10 @@
 
+0. While the installation run perform these steps before you reboot into the installed Ubuntu system from the command line console (ALT-F2 or ALT-F3):
+ - Copy the kernel modules. Verify that /target/modules already exists. Otherwise wait for the installer to create it.
+   @cp -Rfp /lib/modules/3.4*  /target/modules"
+   
+ - Go to /target/boot.
+   copy a boot script which does not load the installation initrd (e.g. boot.hdmi.scr or boot.initrd-noinst.scr) as boot.scr.
 1.
 After installing the Ubuntu Core (or copying the root FS) get the Wireless LAN to work:
 - Edit /etc/network/interfaces. Be inspired by etc/network/interfaces how to setup wlan0 (or whatever the interface name is) to auto-configure with the wpa_supplicant.
