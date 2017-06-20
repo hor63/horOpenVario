@@ -115,22 +115,27 @@ read x
 echo "Hit enter to continue"
 read x
 
-echo "make boot script image"  
-( cd build/boot ; mkimage -A arm -T script -C none -d boot.cmd boot.scr 
-  mkimage -A arm -T script -C none -d boot.noinitrd.cmd boot.noinitrd.scr  || exit 1
+echo "make boot script images"  
+( cd build/boot ; 
   for i in *.cmd
   do
     s=`basename $i .cmd`.scr
     echo "Make boot script $s from $i"
     mkimage -A arm -T script -C none -d $i $s || exit 1
-  done  )
+  done  )  || exit 1
 
 echo "Hit enter to continue"
 read x
 
-echo "compile FEX file to script.bin"
+echo "compile FEX files to binary script files"
 ( 
-  cd build/boot ; ../../src/sunxi-tools/fex2bin -v openvario.fex script.bin  || exit 1
+  cd build/boot ; 
+  for i in *.fex
+  do
+    s=`basename $i .fex`.bin
+    echo "Compile fex file $i to binary script $s"
+    ../../src/sunxi-tools/fex2bin -v $i $s  || exit 1
+  done
 ) || exit 1
 
 
