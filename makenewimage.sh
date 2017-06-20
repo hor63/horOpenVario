@@ -100,8 +100,10 @@ read x
 (cd build/ubuntu/initrd.dir/lib/modules
  echo "copy the modules into the initrd tree"
  sudo rm -rf 3.4.*
- sudo cp -R ../../../../../build/root/lib/modules/3.4* .
+ sudo cp -R ../../../../../build/root/lib/modules/3.4* . || exit 1
  cd ../..
+ echo "Copy a template wpa_supplicant.conf to the initrd"
+ sudo cp ../../../setup-ubuntu/etc/wpa_supplicant.conf etc  || exit 1
  echo "re-build the initrds"
  find * |cpio -o -H newc |gzip > ../myinitrd.gz || exit 1
  find dev lib/modules/3.4.* |cpio -o -H newc |gzip > ../initrd.noinst.gz || exit 1
