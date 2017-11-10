@@ -8,56 +8,32 @@
 # set -x
 
 
-( cd src/sunxi-tools
-  echo "rebuild fex compiler"
-  make bin2fex fex2bin || exit 1
-) || exit 1  
 
-echo "Hit enter to continue"
-read x
-
-
-( cd src/uboot-mainline
+( 
   echo "rebuild uboot"
-  make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-  || exit 1
+  build/u-boot/build.sh  || exit 1
 ) || exit 1  
 
 echo "Hit enter to continue"
 read x
 
 
-( cd src/kernel
+( 
   echo "rebuild the kernel"
-  make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- uImage modules || exit 1
-  echo "Copy the kernel"
-  cp -v arch/arm/boot/uImage ../../build/boot
+  build/kernel/build.sh zImage dtbs || exit 1
+  echo "Copy the kernel and dtb"
+  cp -v build/kernel/arch/arm/boot/zImage build/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb build/boot
 ) || exit 1  
 
 echo "Hit enter to continue"
 read x
 
-( cd src/rtl8188C_8192C_usb_linux_v4.0.2_9000.20130911
-  echo "Build the RTL 8192CU driver"
-  # make -i clean
-  make || exit 1
-) || exit 
-
-echo "Hit enter to continue"
-read x
-
-( cd src/kernel
+(
   echo "Install modules"
-  rm -rf ../../build/root/lib/modules/*
-  make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- INSTALL_MOD_PATH=../../build/root modules_install || exit 1
+  rm -rf build/root/lib/modules/*
+  build/kernel/build.sh INSTALL_MOD_PATH=../../build/root modules_install || exit 1
 ) || exit 1  
 
-echo "Hit enter to continue"
-read x
-
-( cd src/rtl8188C_8192C_usb_linux_v4.0.2_9000.20130911
-  echo "Install RTL 8192CU module"
-  make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- INSTALL_MOD_PATH=../../build/root modules_install || exit 1
-) || exit 1  
 
 echo "Hit enter to continue"
 read x
@@ -79,7 +55,7 @@ read x
    echo "initrd.gz is retained"
  else
    echo "Download initrd.gz"
-   wget "http://ports.ubuntu.com/ubuntu-ports/dists/xenial/main/installer-armhf/current/images/generic/netboot/initrd.gz" || exit 1
+   wget "http://ports.ubuntu.com/ubuntu-ports/dists/artful/main/installer-armhf/current/images/generic/netboot/initrd.gz" || exit 1
  fi
 ) || exit 1
 
@@ -100,13 +76,11 @@ read x
 (cd build/ubuntu/initrd.dir/lib/modules
  echo "copy the modules into the initrd tree"
  sudo rm -rf 3.4.*
- sudo cp -R ../../../../../build/root/lib/modules/3.4* . || exit 1
+ sudo cp -R ../../../../../build/root/lib/modules/* . || exit 1
  cd ../..
- echo "Copy a template wpa_supplicant.conf to the initrd"
- sudo cp ../../../setup-ubuntu/etc/wpa_supplicant.conf etc  || exit 1
  echo "re-build the initrds"
  find * |cpio -o -H newc |gzip > ../myinitrd.gz || exit 1
- find dev lib/modules/3.4.* |cpio -o -H newc |gzip > ../initrd.noinst.gz || exit 1
+ find dev lib/modules/* |cpio -o -H newc |gzip > ../initrd.noinst.gz || exit 1
  cd ..
  mkimage -A arm -T ramdisk -C gzip -d myinitrd.gz uMyinitrd || exit 1
  mkimage -A arm -T ramdisk -C gzip -d initrd.noinst.gz uInitrdNoinst || exit 1
@@ -128,17 +102,6 @@ echo "make boot script images"
 
 echo "Hit enter to continue"
 read x
-
-echo "compile FEX files to binary script files"
-( 
-  cd build/boot ; 
-  for i in *.fex
-  do
-    s=`basename $i .fex`.bin
-    echo "Compile fex file $i to binary script $s"
-    ../../src/sunxi-tools/fex2bin -v $i $s  || exit 1
-  done
-) || exit 1
 
 
 echo "Hit enter to continue"
@@ -176,7 +139,7 @@ echo "Hit enter to continue"
 read x
 
 echo "Copy U-Boot to the SD image"
-sudo dd if=src/uboot-mainline/u-boot-sunxi-with-spl.bin of=/dev/loop0 bs=1024 seek=8 || exit 1
+sudo dd if=build/u-boot/u-boot-sunxi-with-spl.bin of=/dev/loop0 bs=1024 seek=8 || exit 1
 
 echo "Unmount the SD card image"  
 sudo umount sdcard/boot
