@@ -7,6 +7,11 @@
 
 # set -x
 
+no_pause=0
+if test "$1" = "x--no-pause"
+then
+	no_pause=1
+fi
 
 
 ( 
@@ -14,19 +19,25 @@
   build/u-boot/build.sh  || exit 1
 ) || exit 1  
 
+if test $no_pause = 1
+then
 echo "Hit enter to continue"
 read x
+fi
 
 
 ( 
   echo "rebuild the kernel"
-  build/kernel/build.sh zImage dtbs || exit 1
+  build/kernel/build.sh zImage modules dtbs || exit 1
   echo "Copy the kernel and dtb"
   cp -v build/kernel/arch/arm/boot/zImage build/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb build/boot
 ) || exit 1  
 
+if test $no_pause = 1
+then
 echo "Hit enter to continue"
 read x
+fi
 
 (
   echo "Install modules"
@@ -35,19 +46,25 @@ read x
 ) || exit 1  
 
 
+if test $no_pause = 1
+then
 echo "Hit enter to continue"
 read x
+fi
 
 (cd build/ubuntu/
  echo "Fetch the Ubuntu net installer initrd"
  if [ -f initrd.gz ]
  then
-   echo "Installer is already here. Do you want to download again? [yN]"
-   read x
-   if [ "$x" == "Y" -o "$x" == "y" ]
+   if test $no_pause = 1
    then
-     rm initrd.gz
-   fi
+      echo "Installer is already here. Do you want to download again? [yN]"
+      read x
+      if [ "$x" == "Y" -o "$x" == "y" ]
+      then
+        rm initrd.gz
+      fi
+    fi
  fi
 
  if [ -f initrd.gz ]
@@ -59,8 +76,11 @@ read x
  fi
 ) || exit 1
 
+if test $no_pause = 1
+then
 echo "Hit enter to continue"
 read x
+fi
 
 (cd build/ubuntu/
  echo "Unpack the Ubuntu net installer initrd"
@@ -70,8 +90,11 @@ read x
  gunzip < ../initrd.gz |sudo cpio -idmu || exit 1
 ) || exit 1
 
+if test $no_pause = 1
+then
 echo "Hit enter to continue"
 read x
+fi
 
 (cd build/ubuntu/initrd.dir/lib/modules
  echo "copy the modules into the initrd tree"
@@ -88,8 +111,11 @@ read x
  cp -v uInitrdNoinst  ../boot || exit 1
 ) || exit 1
 
+if test $no_pause = 1
+then
 echo "Hit enter to continue"
 read x
+fi
 
 echo "make boot script images"  
 ( cd build/boot ; 
@@ -100,18 +126,28 @@ echo "make boot script images"
     mkimage -A arm -T script -C none -d $i $s || exit 1
   done  )  || exit 1
 
+if test $no_pause = 1
+then
 echo "Hit enter to continue"
 read x
+fi
 
 
+if test $no_pause = 1
+then
 echo "Hit enter to continue"
 read x
+fi
 
 echo "Copy Ubuntu installation instructions and support files to build/boot/setup-ubuntu.tgz" 
 tar -czf build/boot/setup-ubuntu.tgz setup-ubuntu/
 
+if test $no_pause = 1
+then
 echo "Hit enter to continue"
 read x
+fi
+
 echo "Create and partition the SD image"
 dd if=/dev/zero of=sd.img bs=1M count=210 || exit 1
 echo "o
@@ -124,8 +160,12 @@ p
 w
 q" | fdisk sd.img || exit 1
 
+if test $no_pause = 1
+then
 echo "Hit enter to continue"
 read x
+fi
+
 echo "Format and mount the SD image"  
 sudo losetup /dev/loop0 sd.img || exit 1
 sudo partprobe /dev/loop0 || exit 1
@@ -135,8 +175,11 @@ echo "Copy boot environment ot SD card image"
 sudo cp -v build/boot/* sdcard/boot || exit 1
 df
 
+if test $no_pause = 1
+then
 echo "Hit enter to continue"
 read x
+fi
 
 echo "Copy U-Boot to the SD image"
 sudo dd if=build/u-boot/u-boot-sunxi-with-spl.bin of=/dev/loop0 bs=1024 seek=8 || exit 1
