@@ -8,18 +8,17 @@
 # set -x
 
 no_pause=0
-if test "$1" = "x--no-pause"
+if test x"$1" = "x--no-pause"
 then
 	no_pause=1
 fi
-
 
 ( 
   echo "rebuild uboot"
   build/u-boot/build.sh  || exit 1
 ) || exit 1  
 
-if test $no_pause = 1
+if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
@@ -33,7 +32,7 @@ fi
   cp -v build/kernel/arch/arm/boot/zImage build/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb build/boot
 ) || exit 1  
 
-if test $no_pause = 1
+if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
@@ -46,7 +45,7 @@ fi
 ) || exit 1  
 
 
-if test $no_pause = 1
+if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
@@ -56,7 +55,7 @@ fi
  echo "Fetch the Ubuntu net installer initrd"
  if [ -f initrd.gz ]
  then
-   if test $no_pause = 1
+   if test $no_pause = 0
    then
       echo "Installer is already here. Do you want to download again? [yN]"
       read x
@@ -72,11 +71,12 @@ fi
    echo "initrd.gz is retained"
  else
    echo "Download initrd.gz"
-   wget "http://ports.ubuntu.com/ubuntu-ports/dists/artful/main/installer-armhf/current/images/generic/netboot/initrd.gz" || exit 1
+   # wget "http://ports.ubuntu.com/ubuntu-ports/dists/artful/main/installer-armhf/current/images/generic/netboot/initrd.gz" || exit 1
+   wget "http://ports.ubuntu.com/ubuntu-ports/dists/xenial/main/installer-armhf/current/images/generic/netboot/initrd.gz" || exit 1
  fi
 ) || exit 1
 
-if test $no_pause = 1
+if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
@@ -90,7 +90,7 @@ fi
  gunzip < ../initrd.gz |sudo cpio -idmu || exit 1
 ) || exit 1
 
-if test $no_pause = 1
+if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
@@ -111,7 +111,7 @@ fi
  cp -v uInitrdNoinst  ../boot || exit 1
 ) || exit 1
 
-if test $no_pause = 1
+if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
@@ -126,14 +126,14 @@ echo "make boot script images"
     mkimage -A arm -T script -C none -d $i $s || exit 1
   done  )  || exit 1
 
-if test $no_pause = 1
+if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
 fi
 
 
-if test $no_pause = 1
+if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
@@ -142,7 +142,7 @@ fi
 echo "Copy Ubuntu installation instructions and support files to build/boot/setup-ubuntu.tgz" 
 tar -czf build/boot/setup-ubuntu.tgz setup-ubuntu/
 
-if test $no_pause = 1
+if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
@@ -160,7 +160,7 @@ p
 w
 q" | fdisk sd.img || exit 1
 
-if test $no_pause = 1
+if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
@@ -175,7 +175,7 @@ echo "Copy boot environment ot SD card image"
 sudo cp -v build/boot/* sdcard/boot || exit 1
 df
 
-if test $no_pause = 1
+if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
