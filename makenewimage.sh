@@ -13,6 +13,51 @@ then
 	no_pause=1
 fi
 
+
+while test -z "$distris"
+do
+
+    echo " "
+    echo "Selection of distributions which can be installed."
+    echo "Enter:"
+    echo "  a - Artful"
+    echo "  x - Xenial - LTS"
+    echo "  [xa] or ax - both Xenial and Artful. The first will be the default installation."
+
+    read x
+
+    case y"$x" in
+        yxa)
+            distris="xenial artful"
+            defaultDistri=xenial
+            ;;
+        yax)
+            distris="artful xenial"
+            defaultDistri=artful
+            ;;
+        ya)
+            distris="artful"
+            defaultDistri=artful
+            ;;
+        yx)
+            distris="xenial"
+            defaultDistri=xenial
+            ;;
+        y)
+            distris="xenial artful"
+            defaultDistri=xenial
+            ;;
+        *)
+            echo "Invalid input \"$x\"."
+            echo "Allowed are 'x', 'a', 'xa', or 'ax'"
+        ;;
+    esac
+
+done
+    
+echo "Selected distribution(s) is/are $distris"
+
+
 ( 
   echo "rebuild uboot"
   build/u-boot/build.sh  || exit 1
@@ -45,72 +90,87 @@ fi
 ) || exit 1  
 
 
+
 if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
 fi
 
-(cd build/ubuntu/
- echo "Fetch the Ubuntu net installer initrd"
- if [ -f initrd.gz ]
- then
-   if test $no_pause = 0
-   then
-      echo "Installer is already here. Do you want to download again? [yN]"
-      read x
-      if [ "$x" == "Y" -o "$x" == "y" ]
-      then
-        rm initrd.gz
-      fi
+for distri in $distris
+do
+
+    initrd=initrd$distri
+
+    (cd build/ubuntu/
+    echo "Fetch the Ubuntu net installer initrd"
+    if [ -f $initrd.gz ]
+    then
+    if test $no_pause = 0
+    then
+        echo "Installer $initrd.gz is already here. Do you want to download again? [yN]"
+        read x
+        if [ "$x" == "Y" -o "$x" == "y" ]
+        then
+            rm $initrd.gz
+        fi
+        fi
     fi
- fi
 
- if [ -f initrd.gz ]
- then
-   echo "initrd.gz is retained"
- else
-   echo "Download initrd.gz"
-   # wget "http://ports.ubuntu.com/ubuntu-ports/dists/artful/main/installer-armhf/current/images/generic/netboot/initrd.gz" || exit 1
-   wget "http://ports.ubuntu.com/ubuntu-ports/dists/xenial/main/installer-armhf/current/images/generic/netboot/initrd.gz" || exit 1
- fi
-) || exit 1
+    if [ -f $initrd.gz ]
+    then
+        echo "$initrd.gz is retained"
+    else
+        rm -f initrd.gz
+        echo "Download $initrd.gz"
+        wget "http://ports.ubuntu.com/ubuntu-ports/dists/$distri/main/installer-armhf/current/images/generic/netboot/initrd.gz" || exit 1
+        mv initrd.gz $initrd.gz
+    fi
+    ) || exit 1
 
-if test $no_pause = 0
-then
-echo "Hit enter to continue"
-read x
-fi
+    if test $no_pause = 0
+    then
+    echo "Hit enter to continue"
+    read x
+    fi
 
-(cd build/ubuntu/
- echo "Unpack the Ubuntu net installer initrd"
- sudo rm -rf initrd.dir
- mkdir initrd.dir
- cd initrd.dir
- gunzip < ../initrd.gz |sudo cpio -idmu || exit 1
-) || exit 1
+    (cd build/ubuntu/
+    echo "Unpack the Ubuntu net installer $initrd.gz"
+    sudo rm -rf $initrd.dir
+    mkdir $initrd.dir
+    cd $initrd.dir
+    gunzip < ../$initrd.gz |sudo cpio -idmu || exit 1
+    ) || exit 1
 
-if test $no_pause = 0
-then
-echo "Hit enter to continue"
-read x
-fi
+    if test $no_pause = 0
+    then
+    echo "Hit enter to continue"
+    read x
+    fi
 
-(cd build/ubuntu/initrd.dir/lib/modules
- echo "copy the modules into the initrd tree"
- sudo rm -rf 3.4.*
- sudo cp -R ../../../../../build/root/lib/modules/* . || exit 1
- cd ../..
- echo "re-build the initrds"
- find * |cpio -o -H newc |gzip > ../myinitrd.gz || exit 1
- find dev lib/modules/* |cpio -o -H newc |gzip > ../initrd.noinst.gz || exit 1
- cd ..
- mkimage -A arm -T ramdisk -C gzip -d myinitrd.gz uMyinitrd || exit 1
- mkimage -A arm -T ramdisk -C gzip -d initrd.noinst.gz uInitrdNoinst || exit 1
- cp -v uMyinitrd  ../boot || exit 1
- cp -v uInitrdNoinst  ../boot || exit 1
-) || exit 1
+    (cd build/ubuntu/$initrd.dir/lib/modules
+    echo "copy the modules into the $initrd.dir tree"
+    sudo rm -rf 3.4.*
+    sudo cp -R ../../../../../build/root/lib/modules/* . || exit 1
+    cd ../..
+    echo "re-build the initrds"
+    find * |cpio -o -H newc |gzip > ../my$initrd.gz || exit 1
+    find dev lib/modules/* |cpio -o -H newc |gzip > ../$initrd.noinst.gz || exit 1
+    cd ..
+    mkimage -A arm -T ramdisk -C gzip -d my$initrd.gz uMy$initrd || exit 1
+    mkimage -A arm -T ramdisk -C gzip -d $initrd.noinst.gz u${initrd}Noinst || exit 1
+    cp -v uMy$initrd  ../boot || exit 1
+    cp -v u${initrd}Noinst  ../boot || exit 1
+    if test $distri = $defaultDistri
+    then
+        cp -v uMy$initrd  ../boot/uMyinitrd || exit 1
+        cp -v u${initrd}Noinst  ../boot/uInitrdNoinst || exit 1
+    fi
+    ) || exit 1
 
+done # for distri in $distris
+    
+    
 if test $no_pause = 0
 then
 echo "Hit enter to continue"
