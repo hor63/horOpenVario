@@ -23,3 +23,6 @@
 [submodule "src/horI2CtinyUSB"]
 	path = src/horI2CtinyUSB
 	url = https://github.com/hor63/horI2CtinyUSB.git
+[submodule "src/linux-firmware"]
+	path = src/linux-firmware
+	url = https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git
