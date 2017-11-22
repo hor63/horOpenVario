@@ -148,14 +148,18 @@ do
     read x
     fi
 
+    echo "Copy latest linux-firmare into initrd"
+    sudo cp -Rf src/linux-firmware/rtlwifi build/ubuntu/$initrd.dir/lib/firmware
+    sudo rm -rf build/ubuntu/$initrd.dir/lib/firmware/4.*
+
     (cd build/ubuntu/$initrd.dir/lib/modules
     echo "copy the modules into the $initrd.dir tree"
     sudo rm -rf 3.4.*
-    sudo cp -R ../../../../../build/root/lib/modules/* . || exit 1
+    sudo cp -Rf ../../../../../build/root/lib/modules/* . || exit 1
     cd ../..
     echo "re-build the initrds"
     find * |cpio -o -H newc |gzip > ../my$initrd.gz || exit 1
-    find dev lib/modules/* |cpio -o -H newc |gzip > ../$initrd.noinst.gz || exit 1
+    find dev lib/modules |cpio -o -H newc |gzip > ../$initrd.noinst.gz || exit 1
     cd ..
     mkimage -A arm -T ramdisk -C gzip -d my$initrd.gz uMy$initrd || exit 1
     mkimage -A arm -T ramdisk -C gzip -d $initrd.noinst.gz u${initrd}Noinst || exit 1
