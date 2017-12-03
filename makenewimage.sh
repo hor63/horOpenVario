@@ -21,31 +21,19 @@ do
     echo "Selection of distributions which can be installed."
     echo "Enter:"
     echo "  a - Artful"
-    echo "  x - Xenial - LTS"
-    echo "  [xa] or ax - both Xenial and Artful. The first will be the default installation."
+    echo "  x - Xenial - LTS (default)"
 
     read x
 
     case y"$x" in
-        yxa)
-            distris="xenial artful"
-            defaultDistri=xenial
-            ;;
-        yax)
-            distris="artful xenial"
-            defaultDistri=artful
-            ;;
         ya)
             distris="artful"
-            defaultDistri=artful
             ;;
         yx)
             distris="xenial"
-            defaultDistri=xenial
             ;;
         y)
-            distris="xenial artful"
-            defaultDistri=xenial
+            distris="xenial"
             ;;
         *)
             echo "Invalid input \"$x\"."
@@ -163,13 +151,10 @@ do
     cd ..
     mkimage -A arm -T ramdisk -C gzip -d my$initrd.gz uMy$initrd || exit 1
     mkimage -A arm -T ramdisk -C gzip -d $initrd.noinst.gz u${initrd}Noinst || exit 1
-    cp -v uMy$initrd  ../boot || exit 1
-    cp -v u${initrd}Noinst  ../boot || exit 1
-    if test $distri = $defaultDistri
-    then
-        cp -v uMy$initrd  ../boot/uMyinitrd || exit 1
-        cp -v u${initrd}Noinst  ../boot/uInitrdNoinst || exit 1
-    fi
+    # cp -v uMy$initrd  ../boot || exit 1
+    # cp -v u${initrd}Noinst  ../boot || exit 1
+    cp -v uMy$initrd  ../boot/uMyinitrd || exit 1
+    cp -v u${initrd}Noinst  ../boot/uInitrdNoinst || exit 1
     ) || exit 1
 
 done # for distri in $distris
