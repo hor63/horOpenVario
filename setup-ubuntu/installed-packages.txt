@@ -14,3 +14,4 @@ libgeotiff-dev
 ffmpeg quilt lynx 
 libasound2-dev
 nfs-common nfs4-acl-tools nfs-kernel-server
+ssh
