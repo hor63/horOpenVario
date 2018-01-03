@@ -11,6 +11,9 @@ iface lo inet loopback
 #auto eth0
 iface eth0 inet dhcp
 
+auto wlxc4e984d9f153
+iface wlxc4e984d9f153 inet dhcp
+   wpa-conf /etc/wpa_supplicant.conf
 
 auto wlx00085490959f
 iface wlx00085490959f inet dhcp
