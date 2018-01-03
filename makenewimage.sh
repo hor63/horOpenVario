@@ -13,6 +13,13 @@ then
 	no_pause=1
 fi
 
+BASEDIR=`dirname $0`
+BASEDIR="`(cd \"$BASEDIR\" ; BASEDIR=\`pwd\`; echo \"$BASEDIR\")`"
+echo " BASEDIR = $BASEDIR"
+export BASEDIR
+
+cd $BASEDIR
+
 
 while test -z "$distris"
 do
@@ -43,7 +50,7 @@ do
 
 done
     
-echo "Selected distribution(s) is/are $distris"
+echo "Selected distribution is $distris"
 
 
 ( 
@@ -74,10 +81,38 @@ fi
 (
   echo "Install modules"
   rm -rf build/root/lib/modules/*
-  build/kernel/build.sh INSTALL_MOD_PATH=../../build/root modules_install || exit 1
+  build/kernel/build.sh INSTALL_MOD_PATH=$BASEDIR/build/root modules_install || exit 1
 ) || exit 1  
 
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
 
+( 
+  echo "Build the Mali kernel module"
+  cd src/sunxi-mali
+  CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/build/kernel ./build.sh -r r6p2 -b || exit 1
+
+) || exit 1
+
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+
+( 
+  echo "Install the Mali kernel module"
+  cd src/sunxi-mali
+  CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/build/kernel INSTALL_MOD_PATH=$BASEDIR/build/root ./build.sh -r r6p2 -i || exit 1
+
+  # undo the patches for kernel 4.15. Otherwise the next build will fail because applying the patches is part of the build option of build.sh
+  CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/build/kernel ./build.sh -r r6p2 -u
+  exit 0
+
+) || exit 1
 
 if test $no_pause = 0
 then
@@ -142,8 +177,8 @@ do
 
     (cd build/ubuntu/$initrd.dir/lib/modules
     echo "copy the modules into the $initrd.dir tree"
-    sudo rm -rf 3.4.*
-    sudo cp -Rf ../../../../../build/root/lib/modules/* . || exit 1
+    sudo rm -rf *
+    sudo cp -Rf $BASEDIR/build/root/lib/modules/* . || exit 1
     cd ../..
     echo "re-build the initrds"
     find * |cpio -o -H newc |gzip > ../my$initrd.gz || exit 1
