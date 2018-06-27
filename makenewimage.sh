@@ -28,7 +28,8 @@ do
     echo "Selection of distributions which can be installed."
     echo "Enter:"
     echo "  a - Artful"
-    echo "  x - Xenial - LTS (default)"
+    echo "  b - Bionic - LTS (default)"
+    echo "  x - Xenial - LTS"
 
     read x
 
@@ -36,11 +37,14 @@ do
         ya)
             distris="artful"
             ;;
+        ya)
+            distris="bionic"
+            ;;
         yx)
             distris="xenial"
             ;;
         y)
-            distris="xenial"
+            distris="bionic"
             ;;
         *)
             echo "Invalid input \"$x\"."
@@ -93,7 +97,7 @@ fi
 ( 
   echo "Build the Mali kernel module"
   cd src/sunxi-mali
-  CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/build/kernel ./build.sh -r r6p2 -b || exit 1
+  CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/build/kernel ./build.sh -r r8p1 -b || exit 1
 
 ) || exit 1
 
@@ -106,10 +110,10 @@ fi
 ( 
   echo "Install the Mali kernel module"
   cd src/sunxi-mali
-  CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/build/kernel INSTALL_MOD_PATH=$BASEDIR/build/root ./build.sh -r r6p2 -i || exit 1
+  CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/build/kernel INSTALL_MOD_PATH=$BASEDIR/build/root ./build.sh -r r8p1 -i || exit 1
 
-  # undo the patches for kernel 4.15. Otherwise the next build will fail because applying the patches is part of the build option of build.sh
-  CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/build/kernel ./build.sh -r r6p2 -u
+  # undo the patches. Otherwise the next build will fail because applying the patches is part of the build option of build.sh
+  CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/build/kernel ./build.sh -r r8p1 -u
   exit 0
 
 ) || exit 1
