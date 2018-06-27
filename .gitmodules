@@ -25,10 +25,10 @@
 	url = https://github.com/hor63/horI2CtinyUSB.git
 [submodule "src/linux-firmware"]
 	path = src/linux-firmware
-	url = https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git
+	url = https://github.com/hor63/horOpenVario-src-linux-firmware.git
 [submodule "src/sunxi-mali"]
 	path = src/sunxi-mali
-	url = https://github.com/mripard/sunxi-mali.git
+	url = https://github.com/hor63/sunxi-mali.git
 [submodule "src/mali-blobs"]
 	path = src/mali-blobs
-	url = https://github.com/free-electrons/mali-blobs.git
+	url = https://github.com/hor63/horOpenVario-src-mali-blobs.git
