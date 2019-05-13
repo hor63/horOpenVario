@@ -37,7 +37,7 @@ do
         ya)
             distris="artful"
             ;;
-        ya)
+        yb)
             distris="bionic"
             ;;
         yx)
@@ -48,7 +48,7 @@ do
             ;;
         *)
             echo "Invalid input \"$x\"."
-            echo "Allowed are 'x', 'a', 'xa', or 'ax'"
+            echo "Allowed are 'x', 'a'"
         ;;
     esac
 
