@@ -101,7 +101,7 @@ fi
 
 echo "Create and partition the SD image"
 rm -f sd.img || exit 1
-dd if=/dev/zero of=sd.img bs=1M count=3052 || exit 1
+dd if=/dev/zero of=sd.img bs=1M seek=3052 count=0 || exit 1
 echo "o
 n
 p
