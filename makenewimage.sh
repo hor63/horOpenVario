@@ -7,6 +7,22 @@
 
 # set -x
 
+export LANG=C
+
+cleanup_and_exit_error () {
+
+echo "Unmount the SD card image"  
+sudo umount sdcard/sys
+sudo umount sdcard/proc
+sudo umount sdcard/dev/pts
+sudo umount sdcard/dev
+sudo umount sdcard/boot
+sudo umount sdcard
+sudo losetup -d /dev/loop5
+
+exit 1
+}
+
 # Architecture of the target system
 # Can be something like armhf, amd64, i386, arm64, s390 (haha)
 # Must conform with existing Unbuntu architectures
@@ -65,7 +81,8 @@ do
     echo "Selection of distributions which can be installed."
     echo "Enter:"
     echo "  a - Artful"
-    echo "  b - Bionic - LTS (default)"
+    echo "  b - Bionic - LTS"
+    echo "  f - Focal  - LTS (default)"
     echo "  x - Xenial - LTS"
 
     read x
@@ -77,11 +94,14 @@ do
         yb)
             distris="bionic"
             ;;
+        yf)
+            distris="focal"
+            ;;
         yx)
             distris="xenial"
             ;;
         y)
-            distris="bionic"
+            distris="focal"
             ;;
         *)
             echo "Invalid input \"$x\"."
@@ -125,13 +145,13 @@ fi
 
 echo "Format and mount the SD image"  
 sudo losetup /dev/loop5 sd.img || exit 1
-sudo partprobe /dev/loop5 || exit 1
-sudo mkfs.ext2 -F /dev/loop5p1 || exit 1
-sudo mkfs.ext2 -F /dev/loop5p2 || exit 1
+sudo partprobe /dev/loop5 || cleanup_and_exit_error
+sudo mkfs.ext2 -F /dev/loop5p1 || cleanup_and_exit_error
+sudo mkfs.ext2 -F /dev/loop5p2 || cleanup_and_exit_error
 
-sudo mount /dev/loop5p2 sdcard || exit 1
-sudo mkdir -p sdcard/boot || exit 1
-sudo mount /dev/loop5p1 sdcard/boot || exit 1
+sudo mount /dev/loop5p2 sdcard || cleanup_and_exit_error
+sudo mkdir -p sdcard/boot || cleanup_and_exit_error
+sudo mount /dev/loop5p1 sdcard/boot || cleanup_and_exit_error
 
 if test $no_pause = 0
 then
@@ -156,23 +176,23 @@ then
     fi
 fi
 
-echo "Download base packages for $distris distribution and store them in $DEBOOTSTRAP_CACHE"
 if [ ! -f $DEBOOTSTRAP_CACHE ]
 then
+    echo "Download base packages for $distris distribution and store them in $DEBOOTSTRAP_CACHE"
     echo "debootstrap --verbose --arch=$TARGETARCH --make-tarball=$DEBOOTSTRAP_CACHE $distris tmp"
-    sudo debootstrap --verbose --arch=$TARGETARCH --make-tarball=$DEBOOTSTRAP_CACHE $distris tmp || exit 1
+    sudo debootstrap --verbose --arch=$TARGETARCH --make-tarball=$DEBOOTSTRAP_CACHE $distris tmp || cleanup_and_exit_error
 fi
 
 # Copy the static emulator image to the SD card to be able to run programs in the target architecture
 if [ -f /usr/bin/$EMULATOR ]
 then
-    sudo mkdir -p sdcard/usr/bin || exit 1
-    sudo cp -v /usr/bin/$EMULATOR sdcard/usr/bin || exit 1
+    sudo mkdir -p sdcard/usr/bin || cleanup_and_exit_error
+    sudo cp -v /usr/bin/$EMULATOR sdcard/usr/bin || cleanup_and_exit_error
 fi
 
 echo "Create the root file system for $distris distribution"
 echo "sudo debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACHE $distris sdcard"
-sudo debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACHE $distris sdcard || exit 1
+sudo debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACHE $distris sdcard || cleanup_and_exit_error
 
 # Mount the dynamic kernel managed file systems for a pleasant CHROOT experience
 sudo mount -t sysfs sysfs sdcard/sys
@@ -184,16 +204,12 @@ sudo mount -t devpts devpts sdcard/dev/pts
 echo "Set the new root password"
 sudo chroot sdcard /bin/bash -c "passwd root"
 
-echo "Install and set locales"
-sudo chroot sdcard /bin/bash -c "apt-get install locales"
-sudo chroot sdcard /bin/bash -c "dpkg-reconfigure locales"
-
 
 echo "Update the repository sources"
 # Read the server name from the initial sources.list.
 if [ ! -f sdcard/etc/apt/sources.list.bak ]
 then
-    sudo mv sdcard/etc/apt/sources.list sdcard/etc/apt/sources.list.bak || exit 1
+    sudo mv sdcard/etc/apt/sources.list sdcard/etc/apt/sources.list.bak || cleanup_and_exit_error
     cat sdcard/etc/apt/sources.list.bak | while read deb debserver distr package 
     do
         echo "deb debserver distr package = $deb $debserver $distr $package"
@@ -208,13 +224,8 @@ then
     done
 fi
 
-sudo chroot sdcard /bin/bash -c "apt-get update"
-sudo chroot sdcard /bin/bash -c "apt-get upgrade"
-
-echo "Install and set keyboard info"
-sudo chroot sdcard /bin/bash -c "apt-get -y install console-data"
-
-sudo chroot sdcard /bin/bash -c "dpkg-reconfigure tzdata"
+sudo chroot sdcard /bin/bash -c "apt-get -y update"
+sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
 
 echo "Write /etc/fstab"
 echo "# /etc/fstab: static file system information.
@@ -236,18 +247,36 @@ echo "hostname is now:"
 sudo chroot sdcard /bin/bash -c "hostname"
 echo " "
 
-echo "Do you want to configure network adapters, WiFi... manually or menu based with wicd?"
-echo "Please enter m(anual) or w(icd). Default 'w'"
+echo "Do you want to configure network adapters, WiFi... manually or menu based with nmtui or wicd?"
+echo "Please enter (n)mtui (network manager text UI), m(anual) or w(icd). Default 'n'"
 read x
 
 if [ y$x = "y" ]
 then
-    x=w
+    x=n
 fi
 
 if [ y$x = "yw" ]
 then
-    sudo chroot sdcard /bin/bash -c "apt-get install -y wicd-cli wicd-curses wicd-daemon" || exit 1
+    sudo chroot sdcard /bin/bash -c "apt-get -y install wicd-cli wicd-curses wicd-daemon" || cleanup_and_exit_error
+fi
+
+if [ y$x = "yn" ]
+then
+    sudo chroot sdcard /bin/bash -c "apt-get -y install network-manager" || echo "Please run \"apt-get reinstall network-manager\" after booting the target device."
+    echo "Please run \"nmtui\" to configure the network after booting the target device"
+fi
+
+echo "Configure locales and time zone and keyboard"
+sudo chroot sdcard /bin/bash -c "apt-get -y install locales keyboard-configuration console-setup"
+sudo chroot sdcard /bin/bash -c "dpkg-reconfigure locales"
+sudo chroot sdcard /bin/bash -c "dpkg-reconfigure tzdata"
+sudo chroot sdcard /bin/bash -c "dpkg-reconfigure keyboard-configuration"
+
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
 fi
 
 if test $no_pause = 0
@@ -258,8 +287,8 @@ fi
 
 ( 
   echo "rebuild uboot"
-  $BUILDDIR/u-boot/build.sh -j8 || exit 1
-) || exit 1  
+  $BUILDDIR/u-boot/build.sh -j8 || cleanup_and_exit_error
+) || cleanup_and_exit_error  
 
 if test $no_pause = 0
 then
@@ -273,24 +302,24 @@ fi
 
   # Make sure that there is no stale modules directory left.
   # I will derive the linux version from the modules directory name
-  rm -rf $BUILDDIR/kernel/debian/tmp/lib/modules/*
+  rm -rf $BUILDDIR/kernel/debian/*
   
-  # delete previous build artifacts
-  rm $BUILDDIR/*
+  echo "Delete previous build artifacts"
+  rm $BUILDDIR/* 2>/dev/null
   
   if [ $TARGETARCH = armhf ]
   then
-    $BUILDDIR/kernel/build.sh dtbs || exit 1
+    $BUILDDIR/kernel/build.sh dtbs || cleanup_and_exit_error
     echo "Copy the dtb"
     sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb sdcard/boot
   fi # if [ $TARGETARCH = armhf ]
 
   echo "Build Debian kernel package"
-  $BUILDDIR/kernel/build.sh -j8 bindeb-pkg || exit 1
+  $BUILDDIR/kernel/build.sh -j8 bindeb-pkg || cleanup_and_exit_error
   
-) || exit 1  
+) || cleanup_and_exit_error  
 
-LINUX_VERSION=`basename $BUILDDIR/kernel/debian/tmp/lib/modules/*`
+LINUX_VERSION=`basename $BUILDDIR/kernel/debian/linux-image/lib/modules/*`
 echo "LINUX_VERSION = $LINUX_VERSION"
 
 if test $no_pause = 0
@@ -308,13 +337,13 @@ fi
   
   sudo cp -v $BUILDDIR/linux-*$LINUX_VERSION*.deb sdcard
   
-  sudo chroot sdcard bin/bash -c "dpkg -i linux-image-$LINUX_VERSION*.deb" || exit 1
-  sudo chroot sdcard bin/bash -c "dpkg -i linux-headers-$LINUX_VERSION*.deb" || exit 1
-  sudo chroot sdcard bin/bash -c "dpkg -i linux-libc-dev_$LINUX_VERSION*.deb" || exit 1
+  sudo chroot sdcard bin/bash -c "dpkg -i linux-image-$LINUX_VERSION*.deb" || cleanup_and_exit_error
+  sudo chroot sdcard bin/bash -c "dpkg -i linux-headers-$LINUX_VERSION*.deb" || cleanup_and_exit_error
+  sudo chroot sdcard bin/bash -c "dpkg -i linux-libc-dev_$LINUX_VERSION*.deb" || cleanup_and_exit_error
   
-  sudo rm -f sdcard/linux-*$LINUX_VERSION*.deb
+  #sudo rm -f sdcard/linux-*$LINUX_VERSION*.deb
   
-) || exit 1  
+) || cleanup_and_exit_error  
 
 if [ $TARGETARCH = armhf ]
 then
@@ -328,9 +357,9 @@ fi
 ( 
   echo "Build the Mali kernel module"
   cd src/sunxi-mali
-  sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -b || exit 1
+  sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -b || cleanup_and_exit_error
 
-) || exit 1
+) || cleanup_and_exit_error
 
 if test $no_pause = 0
 then
@@ -341,7 +370,7 @@ fi
 ( 
   echo "Install the Mali kernel module"
   cd src/sunxi-mali
-  sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/sdcard ./build.sh -r r8p1 -i || exit 1
+  sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/sdcard ./build.sh -r r8p1 -i || cleanup_and_exit_error
 
   # Rebuild the initrd image with the Mali module
   sudo chroot sdcard /bin/bash -c "update-initramfs -u"
@@ -350,7 +379,7 @@ fi
   sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -u
   exit 0
 
-) || exit 1
+) || cleanup_and_exit_error
 
 fi # if [ $TARGETARCH = armhf ]
 
@@ -361,7 +390,7 @@ read x
 fi
 
 echo "Install Linux firmware"
-sudo chroot sdcard /bin/bash -c "apt-get install linux-firmware" || exit 1
+# sudo chroot sdcard /bin/bash -c "apt-get -y install linux-firmware" || cleanup_and_exit_error
 
 if test $no_pause = 0
 then
@@ -375,15 +404,15 @@ then
 echo "make boot script images"  
 ( cd sdcard/boot ; 
   echo "# setenv bootm_boot_mode sec
-setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10
+setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1
 ext2load mmc 0 0x43000000 sun7i-a20-cubieboard2.dtb
 ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
 ext2load mmc 0 0x41000000 vmlinuz-$LINUX_VERSION
-bootz 0x41000000 0x44000000 0x43000000" |sudo tee boot.cmd > /dev/null || exit 1
+bootz 0x41000000 0x44000000 0x43000000" |sudo tee boot.cmd > /dev/null || cleanup_and_exit_error
 
   echo "Make boot script boot.scr from boot.cmd"
-  sudo mkimage -A arm -T script -C none -d boot.cmd boot.scr || exit 1
-  )  || exit 1
+  sudo mkimage -A arm -T script -C none -d boot.cmd boot.scr || cleanup_and_exit_error
+  )  || cleanup_and_exit_error
 
 if test $no_pause = 0
 then
@@ -393,17 +422,11 @@ fi
 
 fi # if [ $TARGETARCH = armhf ]
 
-if test $no_pause = 0
-then
-echo "Hit enter to continue"
-read x
-fi
-
 echo "Copy Ubuntu installation instructions and support files to sdcard/boot/setup-ubuntu.tgz" 
-sudo tar -czf sdcard/boot/setup-ubuntu.tgz setup-ubuntu/ || exit 1
+sudo tar -czf sdcard/boot/setup-ubuntu.tgz setup-ubuntu/ || cleanup_and_exit_error
 
 #echo "Copy boot environment ot SD card image"  
-#sudo cp -v build/boot/* sdcard/boot || exit 1
+#sudo cp -v build/boot/* sdcard/boot || cleanup_and_exit_error
 df
 
 if test $no_pause = 0
@@ -416,10 +439,17 @@ if [ $TARGETARCH = armhf ]
 then
 
 echo "Copy U-Boot to the SD image"
-sudo dd if=$BUILDDIR/u-boot/u-boot-sunxi-with-spl.bin of=/dev/loop5 bs=1024 seek=8 || exit 1
+sudo dd if=$BUILDDIR/u-boot/u-boot-sunxi-with-spl.bin of=/dev/loop5 bs=1024 seek=8 || cleanup_and_exit_error
 
 fi # if [ $TARGETARCH = armhf ]
 #exit 0
+
+if test $no_pause = 0
+then
+echo "--------------  Almost done --------------------"
+echo "Hit enter to continue"
+read x
+fi
 
 echo "Unmount the SD card image"  
 sudo umount sdcard/sys

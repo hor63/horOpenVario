@@ -1,4 +1,5 @@
 sd.img
-build/kernel4
+sdcard/*
 build/root/*
 build/ubuntu/*
+build/linux-*
