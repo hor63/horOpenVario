@@ -1,8 +1,21 @@
 #!/bin/bash
 
 #    This file is part of horOpenVario 
-#    Copyright (C) 2017  Kai Horstmann <horstmannkai@hotmail.com>
+#    Copyright (C) 2017-2021  Kai Horstmann <horstmannkai@hotmail.com>
 #
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License along
+#    with this program; if not, write to the Free Software Foundation, Inc.,
+#    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 
 # set -x
@@ -12,6 +25,7 @@ export LANG=C
 cleanup_and_exit_error () {
 
 echo "Unmount the SD card image"  
+sync
 sudo umount sdcard/sys
 sudo umount sdcard/proc
 sudo umount sdcard/dev/pts
@@ -121,7 +135,7 @@ fi
 
 echo "Create and partition the SD image"
 rm -f sd.img || exit 1
-dd if=/dev/zero of=sd.img bs=1M seek=3052 count=0 || exit 1
+dd if=/dev/zero of=sd.img bs=1M seek=4096 count=0 || exit 1
 echo "o
 n
 p
@@ -247,8 +261,11 @@ echo "hostname is now:"
 sudo chroot sdcard /bin/bash -c "hostname"
 echo " "
 
-echo "Do you want to configure network adapters, WiFi... manually or menu based with nmtui or wicd?"
-echo "Please enter (n)mtui (network manager text UI), m(anual) or w(icd). Default 'n'"
+echo "Install initramfs tools"
+sudo chroot sdcard /bin/bash -c "apt-get -y install initramfs-tools" || cleanup_and_exit_error
+
+echo "Do you want to configure network adapters, WiFi... manuainitramfs-toolslly or menu based with nmtui or wicd?"
+echo "Please enter n(mtui) (network manager text UI), m(anual) or w(icd). Default 'n'"
 read x
 
 if [ y$x = "y" ]
@@ -332,8 +349,8 @@ fi
 (
   echo "Install kernel and modules and headers"
   
-  # delete the debug kernel images
-  rm -v $BUILDDIR/linux-image-$LINUX_VERSION-dbg*.deb
+  # delete the debug kernel images when they exist
+  rm -fv $BUILDDIR/linux-image-$LINUX_VERSION-dbg*.deb
   
   sudo cp -v $BUILDDIR/linux-*$LINUX_VERSION*.deb sdcard
   
@@ -372,14 +389,19 @@ fi
   cd src/sunxi-mali
   sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/sdcard ./build.sh -r r8p1 -i || cleanup_and_exit_error
 
-  # Rebuild the initrd image with the Mali module
-  sudo chroot sdcard /bin/bash -c "update-initramfs -u"
-  
   # undo the patches. Otherwise the next build will fail because applying the patches is part of the build option of build.sh
   sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -u
   exit 0
 
 ) || cleanup_and_exit_error
+
+# Rebuild the initrd image with the Mali module
+sudo chroot sdcard /bin/bash -c "update-initramfs -uv"
+
+# Assign group "video" to the mali device node.
+sudo cp -v setup-ubuntu/etc/udev/rules.d/50-mali.rules sdcard/etc/udev/rules.d/
+# load the MALI module at boot time.
+echo mali | sudo tee -a sdcard/etc/modules
 
 fi # if [ $TARGETARCH = armhf ]
 
@@ -390,7 +412,7 @@ read x
 fi
 
 echo "Install Linux firmware"
-# sudo chroot sdcard /bin/bash -c "apt-get -y install linux-firmware" || cleanup_and_exit_error
+sudo chroot sdcard /bin/bash -c "apt-get -y install linux-firmware" || cleanup_and_exit_error
 
 if test $no_pause = 0
 then
@@ -406,9 +428,12 @@ echo "make boot script images"
   echo "# setenv bootm_boot_mode sec
 setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1
 ext2load mmc 0 0x43000000 sun7i-a20-cubieboard2.dtb
-ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
+# Building the initrd is broken. The kernel boots without initrd just fine.
+# ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
 ext2load mmc 0 0x41000000 vmlinuz-$LINUX_VERSION
-bootz 0x41000000 0x44000000 0x43000000" |sudo tee boot.cmd > /dev/null || cleanup_and_exit_error
+# Skip the initrd in the boot command.
+# bootz 0x41000000 0x44000000 0x43000000
+bootz 0x41000000 - 0x43000000" |sudo tee boot.cmd > /dev/null || cleanup_and_exit_error
 
   echo "Make boot script boot.scr from boot.cmd"
   sudo mkimage -A arm -T script -C none -d boot.cmd boot.scr || cleanup_and_exit_error
@@ -444,6 +469,99 @@ sudo dd if=$BUILDDIR/u-boot/u-boot-sunxi-with-spl.bin of=/dev/loop5 bs=1024 seek
 fi # if [ $TARGETARCH = armhf ]
 #exit 0
 
+echo "Do you want to install the XCSoar build components on your computer, and on the target image? [Y|n]
+  You can use the installed components on the image also for cross-compiling XCSoar for the cubieboard2"
+read x
+if [ y$x = yy -o y$x = yY]
+then
+  sudo chroot sdcard /bin/bash -c "apt-get -y install \
+    build-essential \
+    make \
+    librsvg2-bin librsvg2-dev \
+    xsltproc \
+    imagemagick \
+    gettext \
+    ffmpeg \
+    git quilt zip m4 automake \
+    ttf-bitstream-vera \
+    fakeroot \
+    g++ \
+    zlib1g-dev \
+    libsodium-dev \
+    libfreetype6-dev \
+    libpng-dev libjpeg-dev \
+    libtiff5-dev libgeotiff-dev \
+    libcurl4-openssl-dev \
+    libc-ares-dev \
+    liblua5.2-dev lua5.2\
+    libxml-parser-perl \
+    libasound2-dev \
+    librsvg2-bin xsltproc \
+    imagemagick gettext \
+    libinput-dev \
+    fonts-dejavu" || cleanup_and_exit_error
+
+  sudo apt-get -y install \
+    build-essential \
+    make \
+    librsvg2-bin librsvg2-dev \
+    xsltproc \
+    imagemagick \
+    gettext \
+    ffmpeg \ || cleanup_and_exit_error
+    git quilt zip m4 automake \
+    ttf-bitstream-vera \
+    fakeroot \
+    g++ \
+    zlib1g-dev \
+    libsodium-dev \
+    libfreetype6-dev \
+    libpng-dev libjpeg-dev \
+    libtiff5-dev libgeotiff-dev \
+    libcurl4-openssl-dev \
+    libc-ares-dev \
+    liblua5.2-dev lua5.2 \
+    libxml-parser-perl \
+    libasound2-dev \
+    librsvg2-bin xsltproc \
+    imagemagick gettext \
+    libinput-dev \
+    fonts-dejavu
+
+  sudo apt-get -y install \
+    mesa-common-dev libgl1-mesa-dev libegl1-mesa-dev \
+fi # Do you want to install the XCSoar build components?
+
+echo "Build the Debian installer for the Mali blob and includes"
+sudo rm -rf build/mali-deb/* || cleanup_and_exit_error
+mkdir build/mali-deb/DEBIAN || cleanup_and_exit_error
+echo "Package: arm-mali-400-fbdev-blob
+Version: 8.1
+Section: custom
+Priority: optional
+Architecture: armhf
+Essential: no
+Installed-Size: 1060
+Maintainer: https://github.com/hor63/horOpenVario/issues
+Description: MALI R8P1 userspace blob for fbdev device" > build/mali-deb/DEBIAN/control
+
+mkdir build/mali-deb/usr || cleanup_and_exit_error
+mkdir build/mali-deb/usr/include || cleanup_and_exit_error
+mkdir build/mali-deb/usr/lib || cleanup_and_exit_error
+mkdir build/mali-deb/usr/lib/arm-linux-gnueabihf || cleanup_and_exit_error
+cp -Rv src/mali-blobs/include/fbdev/* build/mali-deb/usr/include/ || cleanup_and_exit_error
+cp -Rv src/mali-blobs/r8p1/arm/fbdev/lib* build/mali-deb/usr/lib/arm-linux-gnueabihf/ || cleanup_and_exit_error
+chmod -R a-w build/mali-deb/usr/
+chmod -R g-w build/mali-deb/usr/
+chmod +x build/mali-deb/usr/lib/arm-linux-gnueabihf/libMali.so
+chmod u+w build/mali-deb/usr/lib/arm-linux-gnueabihf/libMali.so
+sudo chown -R root build/mali-deb/usr
+dpkg-deb --build build/mali-deb || cleanup_and_exit_error
+sudo mv -v build/mali-deb.deb sdcard/ || cleanup_and_exit_error
+sudo chroot sdcard bin/bash -c "dpkg -i mali-deb.deb" || cleanup_and_exit_error
+
+
+
 if test $no_pause = 0
 then
 echo "--------------  Almost done --------------------"
@@ -452,6 +570,7 @@ read x
 fi
 
 echo "Unmount the SD card image"  
+sync
 sudo umount sdcard/sys
 sudo umount sdcard/proc
 sudo umount sdcard/dev/pts

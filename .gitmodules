@@ -14,12 +14,6 @@
 	path = build/boot
 	url = https://github.com/hor63/horOpenVario-build-boot.git
 
-[submodule "mali"]
-	path = setup-ubuntu/mali/mali
-	url = https://github.com/hor63/sunxi-mali-1.git
-[submodule "libump"]
-	path = setup-ubuntu/mali/ump/libump
-	url = https://github.com/hor63/libump.git
 [submodule "src/horI2CtinyUSB"]
 	path = src/horI2CtinyUSB
 	url = https://github.com/hor63/horI2CtinyUSB.git
@@ -32,3 +26,6 @@
 [submodule "src/mali-blobs"]
 	path = src/mali-blobs
 	url = https://github.com/hor63/horOpenVario-src-mali-blobs.git
+[submodule "mali"]
+	path = setup-ubuntu/mali/mali
+	url = https://github.com/hor63/sunxi-mali-1.git

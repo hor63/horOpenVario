@@ -1,54 +1,17 @@
 
-0. While the installation run perform these steps before you reboot into the installed Ubuntu system from the command line console (ALT-F2 or ALT-F3):
- - Copy the kernel modules. Verify that /target/modules already exists. Otherwise wait for the installer to create it.
-   @cp -Rfp /lib/modules/3.4*  /target/modules"
-   
- - Go to /target/boot.
-   copy a boot script which does not load the installation initrd (e.g. boot.hdmi.scr or boot.initrd-noinst.scr) as boot.scr.
-1.
-After installing the Ubuntu Core (or copying the root FS) get the Wireless LAN to work:
-- Edit /etc/network/interfaces. Be inspired by etc/network/interfaces how to setup wlan0 (or whatever the interface name is) to auto-configure with the wpa_supplicant.
-  check in /sys/class/net what the name of your WLAN interface is, and adjust /etc/network/interfaces accordingly
-- Copy and edit etc/wpa_supplicant.conf to /etc.
-  goto /etc/wpa_suppplicant. search for 'wext'. Edit the files containing it to run wpa_supplicant only with wext, not with the additional 'nl80211' driver which fails with the 3.4 kernel.
-- Edit /etc/wpa_supplicant/functions.sh change the path to the wpa_supplicant program to /usr/local/sbin/wpa_suppicant. 
-  Typically it is defined in this line (already adjusted):
-    WPA_SUP_BIN="/usr/local/sbin/wpa_supplicant"
-  This is because the slightly older version works with the external Realtek driver for my RTL8192CU USB WLAN adapter, but the current wpa_supplicant from the Ubuntu updates does not.
-reboot to get you new configuration to work with "sudo init 6"
+Final steps after booting for the first time.
 
-2.
-Now install all the packages you need for basic compilation of system libraries, and for XCSoar natively on the machine.
-Run
-cat ~/installed-packages.txt | sudo apt-get install -y 
+1.
+Install and/or configure the network using nmtui or wicd (depening on your choice when building the image),
+particularly logging into a WLan.
+
+2. Add a normal user using adduser which you will be using from now on.
 
 3.
-Now install lib-ump:
-sudo dpkg -i mali/ump/libump_3.0-0sunxi1_armhf.deb
-
-4.
-Install the Mali OpenGL ES binary blob.
-load the mali and ump modules:
-sudo modprobe ump
-sudo modprobe mali
-Run lsmod to check if the modules have been loaded.
-change to mali/mali. Run
-sudo make install
-to install the binary blob.
-Copy etc/modules to /etc/modules or edit /etc/modules and add the entries in the local etc/modules (mali and ump) to be loaded at boot time.
-
-5. 
- Grant read/write access to group 'video' to /dev/ump and /dev/mali:
-sudo cp etc/udev/rules.d/50-mali.rules /etc/udev/rules.d/
-
-6.
 Add yourself to the required groups to use the input devices, the Mali EGL and OpenGL ES libraries
 ./addUserToGroups.sh
 
-7.
-reboot with 
-sudo init 6
-
+4. 
 Goto mali/mali/sunxi-mali/test. Run ./test. A smooth triangle should appear. To get back to the text screen enter:
 exit
 CTRL-C
