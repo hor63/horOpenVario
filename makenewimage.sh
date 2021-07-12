@@ -20,7 +20,7 @@
 
 # set -x
 
-export LANG=C
+export LANG=C.UTF-8
 
 cleanup_and_exit_error () {
 
@@ -214,10 +214,40 @@ sudo mount -t proc proc sdcard/proc
 sudo mount -t devtmpfs udev sdcard/dev
 sudo mount -t devpts devpts sdcard/dev/pts
 
-
 echo "Set the new root password"
 sudo chroot sdcard /bin/bash -c "passwd root"
 
+echo "Do you want to use a local APT-Proxy? [y|N]
+  To use this feature you must have apt-proxy-ng installed."
+read x
+if [ y$x = yy -o y$x = yY ]
+then
+    APT_PROXY_HOST=localhost
+    APT_PROXY_PORT=3142
+
+    echo "Enter the proxy host [localhost]"
+    read x
+    if [ y$x != y ]
+    then
+        APT_PROXY_HOST="$x"
+    fi
+
+    echo "Enter the proxy port [3142]"
+    read x
+    if [ y$x != y ]
+    then
+        APT_PROXY_PORT="$x"
+    fi
+
+    echo "Acquire::http::Proxy \"http://$APT_PROXY_HOST:$APT_PROXY_PORT\";
+Acquire::https::Proxy \"http://$APT_PROXY_HOST:$APT_PROXY_PORT\";" | sudo tee sdcard/etc/apt/apt.conf.d/00aptproxy
+fi
+
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
 
 echo "Update the repository sources"
 # Read the server name from the initial sources.list.
@@ -232,14 +262,26 @@ then
             echo "deb $debserver $distr $i" |sudo tee -a sdcard/etc/apt/sources.list
             for k in updates backports security
             do
-            sudo echo "deb $debserver $distr-$k $i" |sudo tee -a sdcard/etc/apt/sources.list > /dev/null
+            sudo echo "deb $debserver $distr-$k $i" |sudo tee -a sdcard/etc/apt/sources.list 
             done
         done
     done
 fi
 
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+
 sudo chroot sdcard /bin/bash -c "apt-get -y update"
 sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
+
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
 
 echo "Write /etc/fstab"
 echo "# /etc/fstab: static file system information.
@@ -276,12 +318,23 @@ fi
 if [ y$x = "yw" ]
 then
     sudo chroot sdcard /bin/bash -c "apt-get -y install wicd-cli wicd-curses wicd-daemon" || cleanup_and_exit_error
+
+    if test $no_pause = 0
+    then
+        echo "Hit enter to continue"
+        read x
+    fi
 fi
 
 if [ y$x = "yn" ]
 then
     sudo chroot sdcard /bin/bash -c "apt-get -y install network-manager" || echo "Please run \"apt-get reinstall network-manager\" after booting the target device."
     echo "Please run \"nmtui\" to configure the network after booting the target device"
+    if test $no_pause = 0
+    then
+        echo "Hit enter to continue"
+        read x
+    fi
 fi
 
 echo "Configure locales and time zone and keyboard"
@@ -289,12 +342,6 @@ sudo chroot sdcard /bin/bash -c "apt-get -y install locales keyboard-configurati
 sudo chroot sdcard /bin/bash -c "dpkg-reconfigure locales"
 sudo chroot sdcard /bin/bash -c "dpkg-reconfigure tzdata"
 sudo chroot sdcard /bin/bash -c "dpkg-reconfigure keyboard-configuration"
-
-if test $no_pause = 0
-then
-echo "Hit enter to continue"
-read x
-fi
 
 if test $no_pause = 0
 then
@@ -345,7 +392,6 @@ echo "Hit enter to continue"
 read x
 fi
 
-
 (
   echo "Install kernel and modules and headers"
   
@@ -362,14 +408,14 @@ fi
   
 ) || cleanup_and_exit_error  
 
-if [ $TARGETARCH = armhf ]
-then
-
 if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
 fi
+
+if [ $TARGETARCH = armhf ]
+then
 
 ( 
   echo "Build the Mali kernel module"
@@ -385,7 +431,7 @@ read x
 fi
 
 ( 
-  echo "Install the Mali kernel module"
+  echo "Install the Mali kernel module in the kernel image"
   cd src/sunxi-mali
   sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/sdcard ./build.sh -r r8p1 -i || cleanup_and_exit_error
 
@@ -394,6 +440,12 @@ fi
   exit 0
 
 ) || cleanup_and_exit_error
+
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
 
 # Rebuild the initrd image with the Mali module
 sudo chroot sdcard /bin/bash -c "update-initramfs -uv"
@@ -472,7 +524,7 @@ fi # if [ $TARGETARCH = armhf ]
 echo "Do you want to install the XCSoar build components on your computer, and on the target image? [Y|n]
   You can use the installed components on the image also for cross-compiling XCSoar for the cubieboard2"
 read x
-if [ y$x = yy -o y$x = yY]
+if [ y$x = yy -o y$x = yY -o y$x = y ]
 then
   sudo chroot sdcard /bin/bash -c "apt-get -y install \
     build-essential \
@@ -495,7 +547,7 @@ then
     libc-ares-dev \
     liblua5.2-dev lua5.2\
     libxml-parser-perl \
-    libasound2-dev \
+    libasound2-dev alsa-base alsamixergui alsaplayer-text alsa-tools\
     librsvg2-bin xsltproc \
     imagemagick gettext \
     libinput-dev \
@@ -508,7 +560,7 @@ then
     xsltproc \
     imagemagick \
     gettext \
-    ffmpeg \ || cleanup_and_exit_error
+    ffmpeg \
     git quilt zip m4 automake \
     ttf-bitstream-vera \
     fakeroot \
@@ -522,14 +574,15 @@ then
     libc-ares-dev \
     liblua5.2-dev lua5.2 \
     libxml-parser-perl \
-    libasound2-dev \
+    libasound2-dev alsa\
     librsvg2-bin xsltproc \
     imagemagick gettext \
     libinput-dev \
-    fonts-dejavu
+    fonts-dejavu || cleanup_and_exit_error
 
   sudo apt-get -y install \
-    mesa-common-dev libgl1-mesa-dev libegl1-mesa-dev \
+    mesa-common-dev libgl1-mesa-dev libegl1-mesa-dev || cleanup_and_exit_error
+    
 fi # Do you want to install the XCSoar build components?
 
 echo "Build the Debian installer for the Mali blob and includes"
@@ -542,25 +595,21 @@ Priority: optional
 Architecture: armhf
 Essential: no
 Installed-Size: 1060
-Maintainer: https://github.com/hor63/horOpenVario/issues
+Maintainer: https://github.com/hor63/horOpenVario
 Description: MALI R8P1 userspace blob for fbdev device" > build/mali-deb/DEBIAN/control
 
 mkdir build/mali-deb/usr || cleanup_and_exit_error
 mkdir build/mali-deb/usr/include || cleanup_and_exit_error
 mkdir build/mali-deb/usr/lib || cleanup_and_exit_error
 mkdir build/mali-deb/usr/lib/arm-linux-gnueabihf || cleanup_and_exit_error
-cp -Rv src/mali-blobs/include/fbdev/* build/mali-deb/usr/include/ || cleanup_and_exit_error
-cp -Rv src/mali-blobs/r8p1/arm/fbdev/lib* build/mali-deb/usr/lib/arm-linux-gnueabihf/ || cleanup_and_exit_error
-chmod -R a-w build/mali-deb/usr/
-chmod -R g-w build/mali-deb/usr/
-chmod +x build/mali-deb/usr/lib/arm-linux-gnueabihf/libMali.so
-chmod u+w build/mali-deb/usr/lib/arm-linux-gnueabihf/libMali.so
-sudo chown -R root build/mali-deb/usr
-dpkg-deb --build build/mali-deb || cleanup_and_exit_error
+cp -Rpv src/mali-blobs/include/fbdev/* build/mali-deb/usr/include/ || cleanup_and_exit_error
+cp -Rpv src/mali-blobs/r8p1/arm/fbdev/lib* build/mali-deb/usr/lib/arm-linux-gnueabihf/ || cleanup_and_exit_error
+find build/mali-deb/usr/ -type d |xargs chmod -v 755 
+find build/mali-deb/usr/include -type f |xargs chmod -v 644
+find build/mali-deb/usr/lib -type f |xargs chmod -v 755
+dpkg-deb --root-owner-group --build build/mali-deb || cleanup_and_exit_error
 sudo mv -v build/mali-deb.deb sdcard/ || cleanup_and_exit_error
 sudo chroot sdcard bin/bash -c "dpkg -i mali-deb.deb" || cleanup_and_exit_error
-
-
 
 if test $no_pause = 0
 then
