@@ -351,7 +351,7 @@ fi
 
 ( 
   echo "rebuild uboot"
-  $BUILDDIR/u-boot/build.sh -j8 || cleanup_and_exit_error
+  $BUILDDIR/u-boot/build.sh -j8 || exit 1
 ) || cleanup_and_exit_error  
 
 if test $no_pause = 0
@@ -373,18 +373,64 @@ fi
   
   if [ $TARGETARCH = armhf ]
   then
-    $BUILDDIR/kernel/build.sh dtbs || cleanup_and_exit_error
+    $BUILDDIR/kernel/build.sh dtbs || exit 1
     echo "Copy the dtb"
     sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb sdcard/boot
   fi # if [ $TARGETARCH = armhf ]
 
   echo "Build Debian kernel package"
-  $BUILDDIR/kernel/build.sh -j8 bindeb-pkg || cleanup_and_exit_error
+  $BUILDDIR/kernel/build.sh -j8 bindeb-pkg || exit 1
   
 ) || cleanup_and_exit_error  
 
 LINUX_VERSION=`basename $BUILDDIR/kernel/debian/linux-image/lib/modules/*`
 echo "LINUX_VERSION = $LINUX_VERSION"
+
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+
+if [ $TARGETARCH = armhf ]
+then
+
+( 
+  echo "Build the Mali kernel module"
+  cd src/sunxi-mali
+  CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -b || exit 1
+
+) || cleanup_and_exit_error
+
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+
+( 
+  echo "Install the Mali kernel module in the kernel DEB image"
+  cd src/sunxi-mali
+  #sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/sdcard ./build.sh -r r8p1 -i || cleanup_and_exit_error
+  CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/$BUILDDIR/kernel/debian/linux-image ./build.sh -r r8p1 -i || exit 1
+
+  # undo the patches. Otherwise the next build will fail because applying the patches is part of the build option of build.sh
+  CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -u
+  exit 0
+
+) || cleanup_and_exit_error
+
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+
+(
+    echo "Re-build the linux image package including MALI"
+    cd $BASEDIR/$BUILDDIR/kernel
+    dpkg-deb --root-owner-group  --build "debian/linux-image" .. || exit 1
+)
 
 if test $no_pause = 0
 then
@@ -400,55 +446,20 @@ fi
   
   sudo cp -v $BUILDDIR/linux-*$LINUX_VERSION*.deb sdcard
   
-  sudo chroot sdcard bin/bash -c "dpkg -i linux-image-$LINUX_VERSION*.deb" || cleanup_and_exit_error
-  sudo chroot sdcard bin/bash -c "dpkg -i linux-headers-$LINUX_VERSION*.deb" || cleanup_and_exit_error
-  sudo chroot sdcard bin/bash -c "dpkg -i linux-libc-dev_$LINUX_VERSION*.deb" || cleanup_and_exit_error
+  sudo chroot sdcard bin/bash -c "dpkg -i linux-image-$LINUX_VERSION*.deb" || exit 1
+  sudo chroot sdcard bin/bash -c "dpkg -i linux-headers-$LINUX_VERSION*.deb" || exit 1
+  sudo chroot sdcard bin/bash -c "dpkg -i linux-libc-dev_$LINUX_VERSION*.deb" || exit 1
   
   #sudo rm -f sdcard/linux-*$LINUX_VERSION*.deb
   
 ) || cleanup_and_exit_error  
 
-if test $no_pause = 0
-then
-echo "Hit enter to continue"
-read x
-fi
-
-if [ $TARGETARCH = armhf ]
-then
-
-( 
-  echo "Build the Mali kernel module"
-  cd src/sunxi-mali
-  sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -b || cleanup_and_exit_error
-
-) || cleanup_and_exit_error
 
 if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
 fi
-
-( 
-  echo "Install the Mali kernel module in the kernel image"
-  cd src/sunxi-mali
-  sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/sdcard ./build.sh -r r8p1 -i || cleanup_and_exit_error
-
-  # undo the patches. Otherwise the next build will fail because applying the patches is part of the build option of build.sh
-  sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -u
-  exit 0
-
-) || cleanup_and_exit_error
-
-if test $no_pause = 0
-then
-echo "Hit enter to continue"
-read x
-fi
-
-# Rebuild the initrd image with the Mali module
-sudo chroot sdcard /bin/bash -c "update-initramfs -uv"
 
 # Assign group "video" to the mali device node.
 sudo cp -v setup-ubuntu/etc/udev/rules.d/50-mali.rules sdcard/etc/udev/rules.d/
