@@ -291,8 +291,8 @@ echo "# /etc/fstab: static file system information.
 # that works even if disks are added and removed. See fstab(5).
 #
 # <file system> <mount point>   <type>  <options>       <dump>  <pass>
-/dev/sda2       /               ext2    nodiratime,errors=remount-ro 0       1
-/dev/sda1       /boot           ext2    nodiratime 0       1
+/dev/mmcblk0p2       /               ext2    nodiratime,errors=remount-ro 0       1
+/dev/mmcblk0p1       /boot           ext2    nodiratime 0       1
 " | sudo tee sdcard/etc/fstab >/dev/null
 
 echo " "
@@ -304,7 +304,9 @@ sudo chroot sdcard /bin/bash -c "hostname"
 echo " "
 
 echo "Install initramfs tools"
-sudo chroot sdcard /bin/bash -c "apt-get -y install initramfs-tools" || cleanup_and_exit_error
+echo "Install suggestions of packages to install for missing commands"
+echo "Install U-Boot tools"
+sudo chroot sdcard /bin/bash -c "apt-get -y install initramfs-tools command-not-found u-boot-tools" || cleanup_and_exit_error
 
 echo "Do you want to configure network adapters, WiFi... manuainitramfs-toolslly or menu based with nmtui or wicd?"
 echo "Please enter n(mtui) (network manager text UI), m(anual) or w(icd). Default 'n'"
@@ -336,12 +338,6 @@ then
         read x
     fi
 fi
-
-echo "Configure locales and time zone and keyboard"
-sudo chroot sdcard /bin/bash -c "apt-get -y install locales keyboard-configuration console-setup"
-sudo chroot sdcard /bin/bash -c "dpkg-reconfigure locales"
-sudo chroot sdcard /bin/bash -c "dpkg-reconfigure tzdata"
-sudo chroot sdcard /bin/bash -c "dpkg-reconfigure keyboard-configuration"
 
 if test $no_pause = 0
 then
@@ -383,7 +379,12 @@ fi
   
 ) || cleanup_and_exit_error  
 
+if [ -d build/kernel/debian/tmp/lib/modules ]
+then
+LINUX_VERSION=`basename $BUILDDIR/kernel/debian/tmp/lib/modules/*`
+else
 LINUX_VERSION=`basename $BUILDDIR/kernel/debian/linux-image/lib/modules/*`
+fi
 echo "LINUX_VERSION = $LINUX_VERSION"
 
 if test $no_pause = 0
@@ -395,76 +396,79 @@ fi
 if [ $TARGETARCH = armhf ]
 then
 
-( 
-  echo "Build the Mali kernel module"
-  cd src/sunxi-mali
-  CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -b || exit 1
+    ( 
+    echo "Build the Mali kernel module"
+    cd src/sunxi-mali
+    CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -b || exit 1
 
-) || cleanup_and_exit_error
+    ) || cleanup_and_exit_error
 
-if test $no_pause = 0
-then
-echo "Hit enter to continue"
-read x
-fi
+    if test $no_pause = 0
+    then
+    echo "Hit enter to continue"
+    read x
+    fi
 
-( 
-  echo "Install the Mali kernel module in the kernel DEB image"
-  cd src/sunxi-mali
-  #sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/sdcard ./build.sh -r r8p1 -i || cleanup_and_exit_error
-  CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/$BUILDDIR/kernel/debian/linux-image ./build.sh -r r8p1 -i || exit 1
+    ( 
+    echo "Install the Mali kernel module in the kernel DEB image"
+    cd src/sunxi-mali
+    #sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/sdcard ./build.sh -r r6p2 -i || cleanup_and_exit_error
+        if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
+        then
+            CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/$BUILDDIR/kernel/debian/tmp ./build.sh -r r8p1 -i || exit 1
+        else
+            CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/$BUILDDIR/kernel/debian/linux-image ./build.sh -r r8p1 -i || exit 1
+        fi
 
-  # undo the patches. Otherwise the next build will fail because applying the patches is part of the build option of build.sh
-  CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -u
-  exit 0
+    # undo the patches. Otherwise the next build will fail because applying the patches is part of the build option of build.sh
+    CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -u
+    exit 0
 
-) || cleanup_and_exit_error
+    ) || cleanup_and_exit_error
 
-if test $no_pause = 0
-then
-echo "Hit enter to continue"
-read x
-fi
+    if test $no_pause = 0
+    then
+    echo "Hit enter to continue"
+    read x
+    fi
 
-(
-    echo "Re-build the linux image package including MALI"
-    cd $BASEDIR/$BUILDDIR/kernel
-    dpkg-deb --root-owner-group  --build "debian/linux-image" .. || exit 1
-)
+    (
+        echo "Re-build the linux image package including MALI"
+        cd $BASEDIR/$BUILDDIR/kernel
+        if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
+        then
+            dpkg-deb --root-owner-group  --build "debian/tmp" .. || exit 1
+        else
+            dpkg-deb --root-owner-group  --build "debian/linux-image" .. || exit 1
+        fi
+    )
 
-if test $no_pause = 0
-then
-echo "Hit enter to continue"
-read x
-fi
+    if test $no_pause = 0
+    then
+    echo "Hit enter to continue"
+    read x
+    fi
 
-(
-  echo "Install kernel and modules and headers"
-  
-  # delete the debug kernel images when they exist
-  rm -fv $BUILDDIR/linux-image-$LINUX_VERSION-dbg*.deb
-  
-  sudo cp -v $BUILDDIR/linux-*$LINUX_VERSION*.deb sdcard
-  
-  sudo chroot sdcard bin/bash -c "dpkg -i linux-image-$LINUX_VERSION*.deb" || exit 1
-  sudo chroot sdcard bin/bash -c "dpkg -i linux-headers-$LINUX_VERSION*.deb" || exit 1
-  sudo chroot sdcard bin/bash -c "dpkg -i linux-libc-dev_$LINUX_VERSION*.deb" || exit 1
-  
-  #sudo rm -f sdcard/linux-*$LINUX_VERSION*.deb
-  
-) || cleanup_and_exit_error  
+    (
+    echo "Install kernel and modules and headers"
+    
+    # delete the debug kernel images when they exist
+    rm -fv $BUILDDIR/linux-image-$LINUX_VERSION-dbg*.deb
+    
+    sudo cp -v $BUILDDIR/linux-*$LINUX_VERSION*.deb sdcard
+    
+    sudo chroot sdcard bin/bash -c "dpkg -i linux-image-$LINUX_VERSION*.deb linux-headers-$LINUX_VERSION*.deb linux-libc-dev_$LINUX_VERSION*.deb" || exit 1
+    #sudo chroot sdcard bin/bash -c "dpkg -i linux-headers-$LINUX_VERSION*.deb" || exit 1
+    #sudo chroot sdcard bin/bash -c "dpkg -i linux-libc-dev_$LINUX_VERSION*.deb" || exit 1
+    
+    #sudo rm -f sdcard/linux-*$LINUX_VERSION*.deb
+    
+    ) || cleanup_and_exit_error  
 
-
-if test $no_pause = 0
-then
-echo "Hit enter to continue"
-read x
-fi
-
-# Assign group "video" to the mali device node.
-sudo cp -v setup-ubuntu/etc/udev/rules.d/50-mali.rules sdcard/etc/udev/rules.d/
-# load the MALI module at boot time.
-echo mali | sudo tee -a sdcard/etc/modules
+    # Assign group "video" to the mali device node.
+    sudo cp -v setup-ubuntu/etc/udev/rules.d/50-mali.rules sdcard/etc/udev/rules.d/
+    # load the MALI module at boot time.
+    echo mali | sudo tee -a sdcard/etc/modules
 
 fi # if [ $TARGETARCH = armhf ]
 
@@ -596,7 +600,39 @@ then
     
 fi # Do you want to install the XCSoar build components?
 
-echo "Build the Debian installer for the Mali blob and includes"
+echo "Configure locales and time zone and keyboard"
+sudo chroot sdcard /bin/bash -c "apt-get -y install locales keyboard-configuration console-setup"
+sudo chroot sdcard /bin/bash -c "dpkg-reconfigure locales"
+sudo chroot sdcard /bin/bash -c "dpkg-reconfigure tzdata"
+sudo chroot sdcard /bin/bash -c "dpkg-reconfigure keyboard-configuration"
+
+echo "Build the Debian installer for the Mali R6P2 blob and includes"
+sudo rm -rf build/mali-deb/* || cleanup_and_exit_error
+mkdir build/mali-deb/DEBIAN || cleanup_and_exit_error
+echo "Package: arm-mali-400-fbdev-blob
+Version: 6.2
+Section: custom
+Priority: optional
+Architecture: armhf
+Essential: no
+Installed-Size: 1060
+Maintainer: https://github.com/hor63/horOpenVario
+Description: MALI R6P2 userspace blob for fbdev device" > build/mali-deb/DEBIAN/control
+
+mkdir build/mali-deb/usr || cleanup_and_exit_error
+mkdir build/mali-deb/usr/include || cleanup_and_exit_error
+mkdir build/mali-deb/usr/lib || cleanup_and_exit_error
+mkdir build/mali-deb/usr/lib/arm-linux-gnueabihf || cleanup_and_exit_error
+cp -Rpv src/mali-blobs/include/fbdev/* build/mali-deb/usr/include/ || cleanup_and_exit_error
+cp -Rpv src/mali-blobs/r6p2/arm/fbdev/lib* build/mali-deb/usr/lib/arm-linux-gnueabihf/ || cleanup_and_exit_error
+find build/mali-deb/usr/ -type d |xargs chmod -v 755 
+find build/mali-deb/usr/include -type f |xargs chmod -v 644
+find build/mali-deb/usr/lib -type f |xargs chmod -v 755
+dpkg-deb --root-owner-group --build build/mali-deb || cleanup_and_exit_error
+sudo mv -v build/mali-deb.deb sdcard/mali-deb-R6P2.deb || cleanup_and_exit_error
+sudo chroot sdcard bin/bash -c "dpkg -i mali-deb-R6P2.deb" || cleanup_and_exit_error
+
+echo "Build the Debian installer for the Mali R8P1 blob and includes"
 sudo rm -rf build/mali-deb/* || cleanup_and_exit_error
 mkdir build/mali-deb/DEBIAN || cleanup_and_exit_error
 echo "Package: arm-mali-400-fbdev-blob
@@ -619,8 +655,8 @@ find build/mali-deb/usr/ -type d |xargs chmod -v 755
 find build/mali-deb/usr/include -type f |xargs chmod -v 644
 find build/mali-deb/usr/lib -type f |xargs chmod -v 755
 dpkg-deb --root-owner-group --build build/mali-deb || cleanup_and_exit_error
-sudo mv -v build/mali-deb.deb sdcard/ || cleanup_and_exit_error
-sudo chroot sdcard bin/bash -c "dpkg -i mali-deb.deb" || cleanup_and_exit_error
+sudo mv -v build/mali-deb.deb sdcard/mali-deb-R8P1.deb || cleanup_and_exit_error
+# sudo chroot sdcard bin/bash -c "dpkg -i mali-deb-R8P1.deb" || cleanup_and_exit_error
 
 if test $no_pause = 0
 then
