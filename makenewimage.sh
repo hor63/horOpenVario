@@ -181,9 +181,11 @@ if [ -f $DEBOOTSTRAP_CACHE ]
 then
 if test $no_pause = 0
 then
-    echo "Root file system cache $DEBOOTSTRAP_CACHE is already here. Do you want to download again? [yN]"
+    echo " "
+    echo "The root file system cache $DEBOOTSTRAP_CACHE is already here."
+    echo "  Do you want to keep it? [Yn]"
     read x
-    if [ "$x" == "Y" -o "$x" == "y" ]
+    if [ "$x" == "n" -o "$x" == "N" ]
     then
         sudo rm $DEBOOTSTRAP_CACHE
     fi
@@ -192,8 +194,8 @@ fi
 
 if [ ! -f $DEBOOTSTRAP_CACHE ]
 then
+    echo " "
     echo "Download base packages for $distris distribution and store them in $DEBOOTSTRAP_CACHE"
-    echo "debootstrap --verbose --arch=$TARGETARCH --make-tarball=$DEBOOTSTRAP_CACHE $distris tmp"
     sudo debootstrap --verbose --arch=$TARGETARCH --make-tarball=$DEBOOTSTRAP_CACHE $distris tmp || cleanup_and_exit_error
 fi
 
@@ -204,6 +206,7 @@ then
     sudo cp -v /usr/bin/$EMULATOR sdcard/usr/bin || cleanup_and_exit_error
 fi
 
+echo " "
 echo "Create the root file system for $distris distribution"
 echo "sudo debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACHE $distris sdcard"
 sudo debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACHE $distris sdcard || cleanup_and_exit_error
@@ -214,11 +217,13 @@ sudo mount -t proc proc sdcard/proc
 sudo mount -t devtmpfs udev sdcard/dev
 sudo mount -t devpts devpts sdcard/dev/pts
 
-echo "Set the new root password"
+echo " "
+echo "Please enter the new root password"
 sudo chroot sdcard /bin/bash -c "passwd root"
 
-echo "Do you want to use a local APT-Proxy? [y|N]
-  To use this feature you must have apt-proxy-ng installed."
+echo " "
+echo "Do you want to use a local APT-Proxy? [y|N]"
+echo "  To use this feature you must have apt-proxy-ng installed."
 read x
 if [ y$x = yy -o y$x = yY ]
 then
@@ -249,23 +254,25 @@ echo "Hit enter to continue"
 read x
 fi
 
+echo " "
 echo "Update the repository sources"
 # Read the server name from the initial sources.list.
 if [ ! -f sdcard/etc/apt/sources.list.bak ]
 then
     sudo mv sdcard/etc/apt/sources.list sdcard/etc/apt/sources.list.bak || cleanup_and_exit_error
-    cat sdcard/etc/apt/sources.list.bak | while read deb debserver distr package 
-    do
-        echo "deb debserver distr package = $deb $debserver $distr $package"
-        for i in main restricted universe multiverse
+    (
+        cat sdcard/etc/apt/sources.list.bak | while read deb debserver distr package 
         do
-            echo "deb $debserver $distr $i" |sudo tee -a sdcard/etc/apt/sources.list
-            for k in updates backports security
+            for i in main restricted universe multiverse
             do
-            sudo echo "deb $debserver $distr-$k $i" |sudo tee -a sdcard/etc/apt/sources.list 
+                echo "deb $debserver $distr $i" 
+                for k in updates backports security
+                do
+                    echo "deb $debserver $distr-$k $i"  
+                done
             done
         done
-    done
+    ) | sudo tee sdcard/etc/apt/sources.list || cleanup_and_exit_error
 fi
 
 if test $no_pause = 0
@@ -274,6 +281,8 @@ echo "Hit enter to continue"
 read x
 fi
 
+echo " "
+echo "Update the installation"
 sudo chroot sdcard /bin/bash -c "apt-get -y update"
 sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
 
@@ -283,6 +292,7 @@ echo "Hit enter to continue"
 read x
 fi
 
+echo " "
 echo "Write /etc/fstab"
 echo "# /etc/fstab: static file system information.
 #
@@ -296,20 +306,22 @@ echo "# /etc/fstab: static file system information.
 " | sudo tee sdcard/etc/fstab >/dev/null
 
 echo " "
-echo "Please enter the host name of the image"
+echo "Please enter the host name of the target computer"
 read x
 sudo chroot sdcard /bin/bash -c "hostname $x"
 echo "hostname is now:"
 sudo chroot sdcard /bin/bash -c "hostname"
-echo " "
 
+echo " "
 echo "Install initramfs tools"
 echo "Install suggestions of packages to install for missing commands"
 echo "Install U-Boot tools"
 sudo chroot sdcard /bin/bash -c "apt-get -y install initramfs-tools command-not-found u-boot-tools" || cleanup_and_exit_error
 
-echo "Do you want to configure network adapters, WiFi... manuainitramfs-toolslly or menu based with nmtui or wicd?"
-echo "Please enter n(mtui) (network manager text UI), m(anual) or w(icd). Default 'n'"
+echo " "
+echo "Do you want to configure network adapters, WiFi... manually"
+echo "  or menu based with nmtui (network manager text UI) or wicd?"
+echo "Please enter n(mtui) , m(anual) or w(icd). Default 'n'"
 read x
 
 if [ y$x = "y" ]
@@ -339,13 +351,8 @@ then
     fi
 fi
 
-if test $no_pause = 0
-then
-echo "Hit enter to continue"
-read x
-fi
-
 ( 
+  echo " "
   echo "rebuild uboot"
   $BUILDDIR/u-boot/build.sh -j8 || exit 1
 ) || cleanup_and_exit_error  
@@ -358,12 +365,14 @@ fi
 
 
 ( 
+  echo " "
   echo "Rebuild the kernel"
 
   # Make sure that there is no stale modules directory left.
   # I will derive the linux version from the modules directory name
   rm -rf $BUILDDIR/kernel/debian/*
   
+  echo " "
   echo "Delete previous build artifacts"
   rm $BUILDDIR/* 2>/dev/null
   
@@ -374,6 +383,7 @@ fi
     sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb sdcard/boot
   fi # if [ $TARGETARCH = armhf ]
 
+  echo " "
   echo "Build Debian kernel package"
   $BUILDDIR/kernel/build.sh -j8 bindeb-pkg || exit 1
   
@@ -385,6 +395,7 @@ LINUX_VERSION=`basename $BUILDDIR/kernel/debian/tmp/lib/modules/*`
 else
 LINUX_VERSION=`basename $BUILDDIR/kernel/debian/linux-image/lib/modules/*`
 fi
+echo " "
 echo "LINUX_VERSION = $LINUX_VERSION"
 
 if test $no_pause = 0
@@ -397,8 +408,13 @@ if [ $TARGETARCH = armhf ]
 then
 
     ( 
+    echo " "
     echo "Build the Mali kernel module"
     cd src/sunxi-mali
+    
+    # Clean the structure and prepare for a new build in case of a previous failure
+    CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -c >/dev/null 2>&1
+
     CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -b || exit 1
 
     ) || cleanup_and_exit_error
@@ -410,8 +426,10 @@ then
     fi
 
     ( 
+    echo " "
     echo "Install the Mali kernel module in the kernel DEB image"
     cd src/sunxi-mali
+    
     #sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/sdcard ./build.sh -r r6p2 -i || cleanup_and_exit_error
         if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
         then
@@ -421,7 +439,7 @@ then
         fi
 
     # undo the patches. Otherwise the next build will fail because applying the patches is part of the build option of build.sh
-    CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -u
+    CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -c
     exit 0
 
     ) || cleanup_and_exit_error
@@ -433,6 +451,7 @@ then
     fi
 
     (
+        echo " "
         echo "Re-build the linux image package including MALI"
         cd $BASEDIR/$BUILDDIR/kernel
         if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
@@ -450,6 +469,7 @@ then
     fi
 
     (
+    echo " "
     echo "Install kernel and modules and headers"
     
     # delete the debug kernel images when they exist
@@ -478,6 +498,7 @@ echo "Hit enter to continue"
 read x
 fi
 
+echo " "
 echo "Install Linux firmware"
 sudo chroot sdcard /bin/bash -c "apt-get -y install linux-firmware" || cleanup_and_exit_error
 
@@ -490,6 +511,7 @@ fi
 if [ $TARGETARCH = armhf ]
 then
 
+echo " "
 echo "make boot script images"  
 ( cd sdcard/boot ; 
   echo "# setenv bootm_boot_mode sec
@@ -502,6 +524,7 @@ ext2load mmc 0 0x41000000 vmlinuz-$LINUX_VERSION
 # bootz 0x41000000 0x44000000 0x43000000
 bootz 0x41000000 - 0x43000000" |sudo tee boot.cmd > /dev/null || cleanup_and_exit_error
 
+  echo " "
   echo "Make boot script boot.scr from boot.cmd"
   sudo mkimage -A arm -T script -C none -d boot.cmd boot.scr || cleanup_and_exit_error
   )  || cleanup_and_exit_error
@@ -530,20 +553,24 @@ fi
 if [ $TARGETARCH = armhf ]
 then
 
+echo " "
 echo "Copy U-Boot to the SD image"
 sudo dd if=$BUILDDIR/u-boot/u-boot-sunxi-with-spl.bin of=/dev/loop5 bs=1024 seek=8 || cleanup_and_exit_error
 
 fi # if [ $TARGETARCH = armhf ]
 #exit 0
 
-echo "Do you want to install the XCSoar build components on your computer, and on the target image? [Y|n]
-  You can use the installed components on the image also for cross-compiling XCSoar for the cubieboard2"
+echo " "
+echo "Do you want to install the XCSoar build components on your computer,"
+echo "and on the target image? [Y|n]"
+echo "  You can use the installed components on the image also for"
+echo "  cross-compiling XCSoar for the cubieboard2"
 read x
 if [ y$x = yy -o y$x = yY -o y$x = y ]
 then
   sudo chroot sdcard /bin/bash -c "apt-get -y install \
     build-essential \
-    make \
+    make flex bison \
     librsvg2-bin librsvg2-dev \
     xsltproc \
     imagemagick \
@@ -562,7 +589,7 @@ then
     libc-ares-dev \
     liblua5.2-dev lua5.2\
     libxml-parser-perl \
-    libasound2-dev alsa-base alsamixergui alsaplayer-text alsa-tools\
+    libasound2-dev alsa-base alsamixergui alsaplayer-text alsa-tools alsa-utils\
     librsvg2-bin xsltproc \
     imagemagick gettext \
     libinput-dev \
@@ -570,7 +597,7 @@ then
 
   sudo apt-get -y install \
     build-essential \
-    make \
+    make flex bison \
     librsvg2-bin librsvg2-dev \
     xsltproc \
     imagemagick \
@@ -600,12 +627,26 @@ then
     
 fi # Do you want to install the XCSoar build components?
 
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+
+echo " "
 echo "Configure locales and time zone and keyboard"
 sudo chroot sdcard /bin/bash -c "apt-get -y install locales keyboard-configuration console-setup"
 sudo chroot sdcard /bin/bash -c "dpkg-reconfigure locales"
 sudo chroot sdcard /bin/bash -c "dpkg-reconfigure tzdata"
 sudo chroot sdcard /bin/bash -c "dpkg-reconfigure keyboard-configuration"
 
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+
+echo " "
 echo "Build the Debian installer for the Mali R6P2 blob and includes"
 sudo rm -rf build/mali-deb/* || cleanup_and_exit_error
 mkdir build/mali-deb/DEBIAN || cleanup_and_exit_error
@@ -630,8 +671,18 @@ find build/mali-deb/usr/include -type f |xargs chmod -v 644
 find build/mali-deb/usr/lib -type f |xargs chmod -v 755
 dpkg-deb --root-owner-group --build build/mali-deb || cleanup_and_exit_error
 sudo mv -v build/mali-deb.deb sdcard/mali-deb-R6P2.deb || cleanup_and_exit_error
+
+echo " "
+echo "Install the Mali R6P2 blob and includes"
 sudo chroot sdcard bin/bash -c "dpkg -i mali-deb-R6P2.deb" || cleanup_and_exit_error
 
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+
+echo " "
 echo "Build the Debian installer for the Mali R8P1 blob and includes"
 sudo rm -rf build/mali-deb/* || cleanup_and_exit_error
 mkdir build/mali-deb/DEBIAN || cleanup_and_exit_error
@@ -658,13 +709,21 @@ dpkg-deb --root-owner-group --build build/mali-deb || cleanup_and_exit_error
 sudo mv -v build/mali-deb.deb sdcard/mali-deb-R8P1.deb || cleanup_and_exit_error
 # sudo chroot sdcard bin/bash -c "dpkg -i mali-deb-R8P1.deb" || cleanup_and_exit_error
 
+
+echo " "
+echo "Update the installation again"
+sudo chroot sdcard /bin/bash -c "apt-get -y update"
+sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
+
 if test $no_pause = 0
 then
+echo " "
 echo "--------------  Almost done --------------------"
 echo "Hit enter to continue"
 read x
 fi
 
+echo " "
 echo "Unmount the SD card image"  
 sync
 sudo umount sdcard/sys
