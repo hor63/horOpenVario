@@ -311,6 +311,9 @@ read x
 sudo chroot sdcard /bin/bash -c "hostname $x"
 echo "hostname is now:"
 sudo chroot sdcard /bin/bash -c "hostname"
+# Make the hostname permanent in the hostname file.
+# By default it is set to the name of the build machine.
+echo $x |sudo tee sdcard/etc/hostname >/dev/null
 
 echo " "
 echo "Install initramfs tools"
@@ -378,9 +381,8 @@ fi
   
   if [ $TARGETARCH = armhf ]
   then
+    echo "Build the device tree image"
     $BUILDDIR/kernel/build.sh dtbs || exit 1
-    echo "Copy the dtb"
-    sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb sdcard/boot
   fi # if [ $TARGETARCH = armhf ]
 
   echo " "
@@ -450,9 +452,45 @@ then
     read x
     fi
 
+    echo " "
+    echo "make boot script images"  
+    ( cd sdcard/boot ; 
+    echo "# setenv bootm_boot_mode sec
+    setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1
+    ext2load mmc 0 0x43000000 sun7i-a20-cubieboard2.dtb
+    # Building the initrd is broken. The kernel boots without initrd just fine.
+    # ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
+    ext2load mmc 0 0x41000000 vmlinuz-$LINUX_VERSION
+    # Skip the initrd in the boot command.
+    # bootz 0x41000000 0x44000000 0x43000000
+    bootz 0x41000000 - 0x43000000" |sudo tee boot.cmd > /dev/null || cleanup_and_exit_error
+
+    echo " "
+    echo "Make boot script boot.scr from boot.cmd"
+    sudo mkimage -A arm -T script -C none -d boot.cmd boot.scr || cleanup_and_exit_error
+    )  || cleanup_and_exit_error
+
+    echo " "
+    echo "Add boot script and device tree to the debian installer image"
+    if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
+    then
+        sudo cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $BUILDDIR/kernel/debian/tmp/boot
+        sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb $BUILDDIR/kernel/debian/tmp/boot
+    else
+        sudo cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $BUILDDIR/kernel/debian/linux-image/boot
+        sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb $BUILDDIR/kernel/debian/linux-image/boot
+    fi
+    
+    if test $no_pause = 0
+    then
+    echo "Hit enter to continue"
+    read x
+    fi
+
+    
     (
         echo " "
-        echo "Re-build the linux image package including MALI"
+        echo "Re-build the linux image package including MALI and boot script"
         cd $BASEDIR/$BUILDDIR/kernel
         if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
         then
@@ -474,6 +512,9 @@ then
     
     # delete the debug kernel images when they exist
     rm -fv $BUILDDIR/linux-image-$LINUX_VERSION-dbg*.deb
+
+    # Clean the boot scripts and device tree. They are now supposed to come with the Debian installer
+    sudo rm -vf sdcard/boot/boot.cmd sdcard/boot/boot.scr sdcard/boot/sun7i-a20-cubieboard2.dtb
     
     sudo cp -v $BUILDDIR/linux-*$LINUX_VERSION*.deb sdcard
     
@@ -507,35 +548,6 @@ then
 echo "Hit enter to continue"
 read x
 fi
-
-if [ $TARGETARCH = armhf ]
-then
-
-echo " "
-echo "make boot script images"  
-( cd sdcard/boot ; 
-  echo "# setenv bootm_boot_mode sec
-setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1
-ext2load mmc 0 0x43000000 sun7i-a20-cubieboard2.dtb
-# Building the initrd is broken. The kernel boots without initrd just fine.
-# ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
-ext2load mmc 0 0x41000000 vmlinuz-$LINUX_VERSION
-# Skip the initrd in the boot command.
-# bootz 0x41000000 0x44000000 0x43000000
-bootz 0x41000000 - 0x43000000" |sudo tee boot.cmd > /dev/null || cleanup_and_exit_error
-
-  echo " "
-  echo "Make boot script boot.scr from boot.cmd"
-  sudo mkimage -A arm -T script -C none -d boot.cmd boot.scr || cleanup_and_exit_error
-  )  || cleanup_and_exit_error
-
-if test $no_pause = 0
-then
-echo "Hit enter to continue"
-read x
-fi
-
-fi # if [ $TARGETARCH = armhf ]
 
 echo "Copy Ubuntu installation instructions and support files to sdcard/boot/setup-ubuntu.tgz" 
 sudo tar -czf sdcard/boot/setup-ubuntu.tgz setup-ubuntu/ || cleanup_and_exit_error
@@ -593,7 +605,11 @@ then
     librsvg2-bin xsltproc \
     imagemagick gettext \
     libinput-dev \
-    fonts-dejavu" || cleanup_and_exit_error
+    liblog4cxx-dev \
+    fonts-dejavu \
+    nfs-common \
+    net-tools \
+    openssh-server " || cleanup_and_exit_error
 
   sudo apt-get -y install \
     build-essential \
@@ -620,7 +636,10 @@ then
     librsvg2-bin xsltproc \
     imagemagick gettext \
     libinput-dev \
-    fonts-dejavu || cleanup_and_exit_error
+    liblog4cxx-dev \
+    fonts-dejavu \
+    nfs-common \
+    net-tools || cleanup_and_exit_error
 
   sudo apt-get -y install \
     mesa-common-dev libgl1-mesa-dev libegl1-mesa-dev || cleanup_and_exit_error
