@@ -133,6 +133,33 @@ echo "Hit enter to continue"
 read x
 fi
 
+echo ""
+echo "Install required packages for building U-Boot, the kernel,"
+echo "and the root file system."
+sudo apt-get update
+sudo apt-get install -y \
+    git \
+    build-essential \
+    crossbuild-essential-armhf \
+    bison \
+    flex \
+    gawk \
+    python \
+    python3 \
+    initramfs-tools \
+    command-not-found \
+    u-boot-tools \
+    dpkg \
+    parted \
+    debootstrap \
+    qemu-user-static \
+    bc \
+    rsync \
+    libssl-dev \
+    quilt
+
+
+echo ""
 echo "Create and partition the SD image"
 rm -f sd.img || exit 1
 dd if=/dev/zero of=sd.img bs=1M seek=4096 count=0 || exit 1
