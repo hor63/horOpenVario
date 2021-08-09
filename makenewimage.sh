@@ -163,6 +163,8 @@ sudo partprobe /dev/loop5 || cleanup_and_exit_error
 sudo mkfs.ext2 -F /dev/loop5p1 || cleanup_and_exit_error
 sudo mkfs.ext2 -F /dev/loop5p2 || cleanup_and_exit_error
 
+mkdir -p sdcard
+
 sudo mount /dev/loop5p2 sdcard || cleanup_and_exit_error
 sudo mkdir -p sdcard/boot || cleanup_and_exit_error
 sudo mount /dev/loop5p1 sdcard/boot || cleanup_and_exit_error
@@ -172,6 +174,9 @@ then
 echo "Hit enter to continue"
 read x
 fi
+
+# Make sure that the static user mode emulation binaries and debootstrap are installed.
+sudo apt-get install -y qemu-user-static debootstrap
 
 DEBOOTSTRAP_CACHE=$BASEDIR/build/ubuntu/debootstrap-${distris}-${TARGETARCH}.tar
 
@@ -196,6 +201,7 @@ if [ ! -f $DEBOOTSTRAP_CACHE ]
 then
     echo " "
     echo "Download base packages for $distris distribution and store them in $DEBOOTSTRAP_CACHE"
+    sudo rm -rf tmp/*
     sudo debootstrap --verbose --arch=$TARGETARCH --make-tarball=$DEBOOTSTRAP_CACHE $distris tmp || cleanup_and_exit_error
 fi
 
@@ -357,7 +363,7 @@ fi
 ( 
   echo " "
   echo "rebuild uboot"
-  $BUILDDIR/u-boot/build.sh -j8 || exit 1
+  $BUILDDIR/u-boot/build.sh -j3 || exit 1
 ) || cleanup_and_exit_error  
 
 if test $no_pause = 0
@@ -387,7 +393,7 @@ fi
 
   echo " "
   echo "Build Debian kernel package"
-  $BUILDDIR/kernel/build.sh -j8 bindeb-pkg || exit 1
+  $BUILDDIR/kernel/build.sh -j3 bindeb-pkg || exit 1
   
 ) || cleanup_and_exit_error  
 
@@ -456,7 +462,7 @@ then
     echo "make boot script images"  
     ( cd sdcard/boot ; 
     echo "# setenv bootm_boot_mode sec
-    setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1
+    setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1 cma=256M
     ext2load mmc 0 0x43000000 sun7i-a20-cubieboard2.dtb
     # Building the initrd is broken. The kernel boots without initrd just fine.
     # ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
@@ -519,10 +525,6 @@ then
     sudo cp -v $BUILDDIR/linux-*$LINUX_VERSION*.deb sdcard
     
     sudo chroot sdcard bin/bash -c "dpkg -i linux-image-$LINUX_VERSION*.deb linux-headers-$LINUX_VERSION*.deb linux-libc-dev_$LINUX_VERSION*.deb" || exit 1
-    #sudo chroot sdcard bin/bash -c "dpkg -i linux-headers-$LINUX_VERSION*.deb" || exit 1
-    #sudo chroot sdcard bin/bash -c "dpkg -i linux-libc-dev_$LINUX_VERSION*.deb" || exit 1
-    
-    #sudo rm -f sdcard/linux-*$LINUX_VERSION*.deb
     
     ) || cleanup_and_exit_error  
 
@@ -572,6 +574,38 @@ sudo dd if=$BUILDDIR/u-boot/u-boot-sunxi-with-spl.bin of=/dev/loop5 bs=1024 seek
 fi # if [ $TARGETARCH = armhf ]
 #exit 0
 
+# write the list of required packages for development and compiling openEVario and XCSoar
+# into a text file for immediate or later installation.
+echo " build-essential
+    g++
+    make flex bison
+    librsvg2-bin librsvg2-dev
+    xsltproc
+    imagemagick
+    gettext
+    ffmpeg
+    git quilt zip m4
+    automake autoconf autoconf-archive
+    ttf-bitstream-vera
+    fakeroot
+    zlib1g-dev
+    libsodium-dev
+    libfreetype6-dev
+    libpng-dev libjpeg-dev
+    libtiff5-dev libgeotiff-dev
+    libcurl4-openssl-dev
+    libc-ares-dev
+    liblua5.2-dev lua5.2
+    libxml-parser-perl
+    libasound2-dev alsa-base alsaplayer-text alsa-tools alsa-utils
+    librsvg2-bin xsltproc
+    imagemagick gettext
+    libinput-dev
+    fonts-dejavu
+    nfs-common
+    net-tools
+    openssh-server" | sudo tee sdcard/dev-packages.txt > /dev/null
+
 echo " "
 echo "Do you want to install the XCSoar build components on your computer,"
 echo "and on the target image? [Y|n]"
@@ -580,69 +614,15 @@ echo "  cross-compiling XCSoar for the cubieboard2"
 read x
 if [ y$x = yy -o y$x = yY -o y$x = y ]
 then
-  sudo chroot sdcard /bin/bash -c "apt-get -y install \
-    build-essential \
-    make flex bison \
-    librsvg2-bin librsvg2-dev \
-    xsltproc \
-    imagemagick \
-    gettext \
-    ffmpeg \
-    git quilt zip m4 automake \
-    ttf-bitstream-vera \
-    fakeroot \
-    g++ \
-    zlib1g-dev \
-    libsodium-dev \
-    libfreetype6-dev \
-    libpng-dev libjpeg-dev \
-    libtiff5-dev libgeotiff-dev \
-    libcurl4-openssl-dev \
-    libc-ares-dev \
-    liblua5.2-dev lua5.2\
-    libxml-parser-perl \
-    libasound2-dev alsa-base alsamixergui alsaplayer-text alsa-tools alsa-utils\
-    librsvg2-bin xsltproc \
-    imagemagick gettext \
-    libinput-dev \
-    liblog4cxx-dev \
-    fonts-dejavu \
-    nfs-common \
-    net-tools \
-    openssh-server " || cleanup_and_exit_error
+  sudo chroot sdcard /bin/bash -c "cat /dev-packages.txt |xargs apt-get -y install " || cleanup_and_exit_error
 
-  sudo apt-get -y install \
-    build-essential \
-    make flex bison \
-    librsvg2-bin librsvg2-dev \
-    xsltproc \
-    imagemagick \
-    gettext \
-    ffmpeg \
-    git quilt zip m4 automake \
-    ttf-bitstream-vera \
-    fakeroot \
-    g++ \
-    zlib1g-dev \
-    libsodium-dev \
-    libfreetype6-dev \
-    libpng-dev libjpeg-dev \
-    libtiff5-dev libgeotiff-dev \
-    libcurl4-openssl-dev \
-    libc-ares-dev \
-    liblua5.2-dev lua5.2 \
-    libxml-parser-perl \
-    libasound2-dev alsa\
-    librsvg2-bin xsltproc \
-    imagemagick gettext \
-    libinput-dev \
-    liblog4cxx-dev \
-    fonts-dejavu \
-    nfs-common \
-    net-tools || cleanup_and_exit_error
+  cat sdcard/dev-packages.txt | xargs sudo apt-get -y install || cleanup_and_exit_error
 
-  sudo apt-get -y install \
-    mesa-common-dev libgl1-mesa-dev libegl1-mesa-dev || cleanup_and_exit_error
+# Mesa is incompatible with Mali on the target device.
+# Cross tools are useless on the target machine.
+sudo apt-get -y install \
+    mesa-common-dev libgl1-mesa-dev libegl1-mesa-dev \
+    crossbuild-essential-armhf || cleanup_and_exit_error
     
 fi # Do you want to install the XCSoar build components?
 
@@ -691,9 +671,9 @@ find build/mali-deb/usr/lib -type f |xargs chmod -v 755
 dpkg-deb --root-owner-group --build build/mali-deb || cleanup_and_exit_error
 sudo mv -v build/mali-deb.deb sdcard/mali-deb-R6P2.deb || cleanup_and_exit_error
 
-echo " "
-echo "Install the Mali R6P2 blob and includes"
-sudo chroot sdcard bin/bash -c "dpkg -i mali-deb-R6P2.deb" || cleanup_and_exit_error
+#echo " "
+#echo "Install the Mali R6P2 blob and includes"
+#sudo chroot sdcard bin/bash -c "dpkg -i mali-deb-R6P2.deb" || cleanup_and_exit_error
 
 if test $no_pause = 0
 then
@@ -726,7 +706,10 @@ find build/mali-deb/usr/include -type f |xargs chmod -v 644
 find build/mali-deb/usr/lib -type f |xargs chmod -v 755
 dpkg-deb --root-owner-group --build build/mali-deb || cleanup_and_exit_error
 sudo mv -v build/mali-deb.deb sdcard/mali-deb-R8P1.deb || cleanup_and_exit_error
-# sudo chroot sdcard bin/bash -c "dpkg -i mali-deb-R8P1.deb" || cleanup_and_exit_error
+
+echo " "
+echo "Install the Mali R8P1 blob and includes"
+sudo chroot sdcard bin/bash -c "dpkg -i mali-deb-R8P1.deb" || cleanup_and_exit_error
 
 
 echo " "

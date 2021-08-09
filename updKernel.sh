@@ -134,6 +134,10 @@ then
     ( 
     echo "Build the Mali kernel module"
     cd src/sunxi-mali
+
+    # Clean the structure and prepare for a new build in case of a previous failure
+    CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -c >/dev/null 2>&1
+
     CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -b || exit 1
 
     ) || cleanup_and_exit_error
@@ -147,7 +151,7 @@ then
     ( 
     echo "Install the Mali kernel module in the kernel DEB image"
     cd src/sunxi-mali
-    #sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/sdcard ./build.sh -r r6p2 -i || cleanup_and_exit_error
+
     if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
     then
         CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/$BUILDDIR/kernel/debian/tmp ./build.sh -r r8p1 -i || exit 1
@@ -229,7 +233,7 @@ fi # if [ $TARGETARCH = armhf ]
   sudo chroot sdcard bin/bash -c "apt-get remove -y \"linux-image*\""
   sudo chroot sdcard bin/bash -c "apt-get remove -y \"linux-headers*\""
   #sudo chroot sdcard bin/bash -c "apt-get remove -y \"linux-libc-dev*\""
-  sudo rm -v sdcard/linux*.deb || exit 1
+  sudo rm -v sdcard/linux*.deb
 
   # Clean the boot scripts and device tree. They are now supposed to come with the Debian installer
   sudo rm -vf sdcard/boot/boot.cmd sdcard/boot/boot.scr sdcard/boot/sun7i-a20-cubieboard2.dtb
