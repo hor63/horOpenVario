@@ -156,7 +156,8 @@ sudo apt-get install -y \
     bc \
     rsync \
     libssl-dev \
-    quilt
+    quilt \
+    avahi-daemon avahi-discover libnss-mdns
 
 
 echo ""
@@ -201,9 +202,6 @@ then
 echo "Hit enter to continue"
 read x
 fi
-
-# Make sure that the static user mode emulation binaries and debootstrap are installed.
-sudo apt-get install -y qemu-user-static debootstrap
 
 DEBOOTSTRAP_CACHE=$BASEDIR/build/ubuntu/debootstrap-${distris}-${TARGETARCH}.tar
 
@@ -354,6 +352,9 @@ echo "Install suggestions of packages to install for missing commands"
 echo "Install U-Boot tools"
 sudo chroot sdcard /bin/bash -c "apt-get -y install initramfs-tools command-not-found u-boot-tools" || cleanup_and_exit_error
 
+echo "Install zeroconfig components and parted"
+sudo chroot sdcard /bin/bash -c "apt-get -y install avahi-daemon avahi-discover libnss-mdns parted" || cleanup_and_exit_error
+
 echo " "
 echo "Do you want to configure network adapters, WiFi... manually"
 echo "  or menu based with nmtui (network manager text UI) or wicd?"
@@ -386,6 +387,8 @@ then
         read x
     fi
 fi
+
+
 
 ( 
   echo " "
