@@ -22,6 +22,7 @@
 
 export LANG=C.UTF-8
 
+# ==========================================
 cleanup_and_exit_error () {
 
 echo "Unmount the SD card image"  
@@ -35,7 +36,10 @@ sudo umount sdcard
 sudo losetup -d /dev/loop5
 
 exit 1
-}
+} # cleanup_and_exit_error ()
+
+# ===================================================
+select_arch_and_distribution () {
 
 # Architecture of the target system
 # Can be something like armhf, amd64, i386, arm64, s390 (haha)
@@ -82,11 +86,6 @@ fi
 
 BASEDIR=`dirname $0`
 BASEDIR="`(cd \"$BASEDIR\" ; BASEDIR=\`pwd\`; echo \"$BASEDIR\")`"
-echo " BASEDIR = $BASEDIR"
-export BASEDIR
-
-cd $BASEDIR
-
 
 while test -z "$distris"
 do
@@ -124,18 +123,19 @@ do
     esac
 
 done
-    
-echo "Selected distribution is $distris"
+} # select_arch_and_distribution ()
 
+# ==========================================
+install_build_packages () {
+echo ""
+echo "Install required packages for building U-Boot, the kernel,"
+echo "and the root file system."
 if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
 fi
 
-echo ""
-echo "Install required packages for building U-Boot, the kernel,"
-echo "and the root file system."
 sudo apt-get update
 sudo apt-get install -y \
     git \
@@ -158,10 +158,19 @@ sudo apt-get install -y \
     libssl-dev \
     quilt \
     avahi-daemon avahi-discover libnss-mdns
+} # install_build_packages ()
 
 
+# ==========================================
+create_partition_sd_image () {
 echo ""
 echo "Create and partition the SD image"
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+
 rm -f sd.img || exit 1
 dd if=/dev/zero of=sd.img bs=1M seek=4096 count=0 || exit 1
 echo "o
@@ -179,13 +188,19 @@ p
 w
 q" | fdisk sd.img || exit 1
 
+} # create_partition_sd_image ()
+
+# ==========================================
+format_mount_sd_image () {
+
+echo " "  
+echo "Format and mount the SD image"  
 if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
 fi
 
-echo "Format and mount the SD image"  
 sudo losetup /dev/loop5 sd.img || exit 1
 sudo partprobe /dev/loop5 || cleanup_and_exit_error
 sudo mkfs.ext2 -F /dev/loop5p1 || cleanup_and_exit_error
@@ -197,6 +212,13 @@ sudo mount /dev/loop5p2 sdcard || cleanup_and_exit_error
 sudo mkdir -p sdcard/boot || cleanup_and_exit_error
 sudo mount /dev/loop5p1 sdcard/boot || cleanup_and_exit_error
 
+} # format_mount_sd_image ()
+
+# ==========================================
+download_base_system_tarball () {
+
+echo " "
+echo "Download the base installation as tarball"
 if test $no_pause = 0
 then
 echo "Hit enter to continue"
@@ -230,6 +252,11 @@ then
     sudo debootstrap --verbose --arch=$TARGETARCH --make-tarball=$DEBOOTSTRAP_CACHE $distris tmp || cleanup_and_exit_error
 fi
 
+} # download_base_system_tarball ()
+
+# ==========================================
+install_base_system () {
+
 # Copy the static emulator image to the SD card to be able to run programs in the target architecture
 if [ -f /usr/bin/$EMULATOR ]
 then
@@ -238,9 +265,19 @@ then
 fi
 
 echo " "
-echo "Create the root file system for $distris distribution"
-echo "sudo debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACHE $distris sdcard"
+echo "Create the root file system for $distris distribution with"
+echo "\"sudo debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACHE $distris sdcard \""
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
 sudo debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACHE $distris sdcard || cleanup_and_exit_error
+
+} # install_base_system ()
+
+# ==========================================
+update_complete_base_system () {
 
 # Mount the dynamic kernel managed file systems for a pleasant CHROOT experience
 sudo mount -t sysfs sysfs sdcard/sys
@@ -249,7 +286,7 @@ sudo mount -t devtmpfs udev sdcard/dev
 sudo mount -t devpts devpts sdcard/dev/pts
 
 echo " "
-echo "Please enter the new root password"
+echo "Please enter the new root password of the target image"
 sudo chroot sdcard /bin/bash -c "passwd root"
 
 echo " "
@@ -279,14 +316,14 @@ then
 Acquire::https::Proxy \"http://$APT_PROXY_HOST:$APT_PROXY_PORT\";" | sudo tee sdcard/etc/apt/apt.conf.d/00aptproxy
 fi
 
+
+echo " "
+echo "Update the repository sources"
 if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
 fi
-
-echo " "
-echo "Update the repository sources"
 # Read the server name from the initial sources.list.
 if [ ! -f sdcard/etc/apt/sources.list.bak ]
 then
@@ -306,14 +343,14 @@ then
     ) | sudo tee sdcard/etc/apt/sources.list || cleanup_and_exit_error
 fi
 
+echo " "
+echo "Update the installation"
 if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
 fi
 
-echo " "
-echo "Update the installation"
 sudo chroot sdcard /bin/bash -c "apt-get -y update"
 sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
 
@@ -334,7 +371,7 @@ echo "# /etc/fstab: static file system information.
 # <file system> <mount point>   <type>  <options>       <dump>  <pass>
 /dev/mmcblk0p2       /               ext2    nodiratime,errors=remount-ro 0       1
 /dev/mmcblk0p1       /boot           ext2    nodiratime 0       1
-" | sudo tee sdcard/etc/fstab >/dev/null
+" | sudo tee sdcard/etc/fstab 
 
 echo " "
 echo "Please enter the host name of the target computer"
@@ -348,12 +385,24 @@ echo $x |sudo tee sdcard/etc/hostname >/dev/null
 
 echo " "
 echo "Install initramfs tools"
-echo "Install suggestions of packages to install for missing commands"
+echo "Install bash suggestions of packages to install for missing commands"
+echo "Install bash completion"
 echo "Install U-Boot tools"
-sudo chroot sdcard /bin/bash -c "apt-get -y install initramfs-tools command-not-found u-boot-tools" || cleanup_and_exit_error
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+sudo chroot sdcard /bin/bash -c "apt-get -y install initramfs-tools command-not-found bash-completion u-boot-tools" || cleanup_and_exit_error
 
+echo " "
 echo "Install zeroconfig components and parted"
 sudo chroot sdcard /bin/bash -c "apt-get -y install avahi-daemon avahi-discover libnss-mdns parted" || cleanup_and_exit_error
+
+} # update_complete_base_system ()
+
+# ==========================================
+install_network_management () {
 
 echo " "
 echo "Do you want to configure network adapters, WiFi... manually"
@@ -387,25 +436,36 @@ then
         read x
     fi
 fi
+} # install_network_management ()
 
-
-
-( 
-  echo " "
-  echo "rebuild uboot"
-  $BUILDDIR/u-boot/build.sh -j3 || exit 1
-) || cleanup_and_exit_error  
+# ==========================================
+rebuild_u_boot () {
 
 if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
 fi
+echo " "
+echo "Rebuild uboot"
+
+( 
+  $BUILDDIR/u-boot/build.sh -j8 || exit 1
+) || cleanup_and_exit_error  
+
+} # rebuild_u_boot ()
 
 
+# ==========================================
+build_kernel_deb () {
 ( 
   echo " "
   echo "Rebuild the kernel"
+  if test $no_pause = 0
+  then
+  echo "Hit enter to continue"
+  read x
+  fi
 
   # Make sure that there is no stale modules directory left.
   # I will derive the linux version from the modules directory name
@@ -417,13 +477,14 @@ fi
   
   if [ $TARGETARCH = armhf ]
   then
+    echo " "
     echo "Build the device tree image"
     $BUILDDIR/kernel/build.sh dtbs || exit 1
   fi # if [ $TARGETARCH = armhf ]
 
   echo " "
   echo "Build Debian kernel package"
-  $BUILDDIR/kernel/build.sh -j3 bindeb-pkg || exit 1
+  $BUILDDIR/kernel/build.sh -j8 bindeb-pkg || exit 1
   
 ) || cleanup_and_exit_error  
 
@@ -436,11 +497,10 @@ fi
 echo " "
 echo "LINUX_VERSION = $LINUX_VERSION"
 
-if test $no_pause = 0
-then
-echo "Hit enter to continue"
-read x
-fi
+} # build_kernel_deb ()
+
+# ==========================================
+build_mali_module () {
 
 if [ $TARGETARCH = armhf ]
 then
@@ -448,6 +508,11 @@ then
     ( 
     echo " "
     echo "Build the Mali kernel module"
+    if test $no_pause = 0
+    then
+      echo "Hit enter to continue"
+      read x
+    fi
     cd src/sunxi-mali
     
     # Clean the structure and prepare for a new build in case of a previous failure
@@ -457,15 +522,15 @@ then
 
     ) || cleanup_and_exit_error
 
+
+    ( 
+    echo " "
+    echo "Install the Mali kernel module in the kernel DEB image"
     if test $no_pause = 0
     then
     echo "Hit enter to continue"
     read x
     fi
-
-    ( 
-    echo " "
-    echo "Install the Mali kernel module in the kernel DEB image"
     cd src/sunxi-mali
     
     #sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/sdcard ./build.sh -r r6p2 -i || cleanup_and_exit_error
@@ -482,127 +547,165 @@ then
 
     ) || cleanup_and_exit_error
 
-    if test $no_pause = 0
-    then
-    echo "Hit enter to continue"
-    read x
-    fi
-
-    echo " "
-    echo "make boot script images"  
-    ( cd sdcard/boot ; 
-    echo "# setenv bootm_boot_mode sec
-    setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1
-    ext2load mmc 0 0x43000000 sun7i-a20-cubieboard2.dtb
-    # Building the initrd is broken. The kernel boots without initrd just fine.
-    # ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
-    ext2load mmc 0 0x41000000 vmlinuz-$LINUX_VERSION
-    # Skip the initrd in the boot command.
-    # bootz 0x41000000 0x44000000 0x43000000
-    bootz 0x41000000 - 0x43000000" |sudo tee boot.cmd > /dev/null || cleanup_and_exit_error
-
-    echo " "
-    echo "Make boot script boot.scr from boot.cmd"
-    sudo mkimage -A arm -T script -C none -d boot.cmd boot.scr || cleanup_and_exit_error
-    )  || cleanup_and_exit_error
-
-    echo " "
-    echo "Add boot script and device tree to the debian installer image"
-    if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
-    then
-        sudo cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $BUILDDIR/kernel/debian/tmp/boot
-        sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb $BUILDDIR/kernel/debian/tmp/boot
-    else
-        sudo cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $BUILDDIR/kernel/debian/linux-image/boot
-        sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb $BUILDDIR/kernel/debian/linux-image/boot
-    fi
-    
-    if test $no_pause = 0
-    then
-    echo "Hit enter to continue"
-    read x
-    fi
-
-    
-    (
-        echo " "
-        echo "Re-build the linux image package including MALI and boot script"
-        cd $BASEDIR/$BUILDDIR/kernel
-        if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
-        then
-            dpkg-deb --root-owner-group  --build "debian/tmp" .. || exit 1
-        else
-            dpkg-deb --root-owner-group  --build "debian/linux-image" .. || exit 1
-        fi
-    )
-
-    if test $no_pause = 0
-    then
-    echo "Hit enter to continue"
-    read x
-    fi
-
-    (
-    echo " "
-    echo "Install kernel and modules and headers"
-    
-    # delete the debug kernel images when they exist
-    rm -fv $BUILDDIR/linux-image-$LINUX_VERSION-dbg*.deb
-
-    # Clean the boot scripts and device tree. They are now supposed to come with the Debian installer
-    sudo rm -vf sdcard/boot/boot.cmd sdcard/boot/boot.scr sdcard/boot/sun7i-a20-cubieboard2.dtb
-    
-    sudo cp -v $BUILDDIR/linux-*$LINUX_VERSION*.deb sdcard
-    
-    sudo chroot sdcard bin/bash -c "dpkg -i linux-image-$LINUX_VERSION*.deb linux-headers-$LINUX_VERSION*.deb linux-libc-dev_$LINUX_VERSION*.deb" || exit 1
-    
-    ) || cleanup_and_exit_error  
-
-    # Assign group "video" to the mali device node.
-    sudo cp -v setup-ubuntu/etc/udev/rules.d/50-mali.rules sdcard/etc/udev/rules.d/
-    # load the MALI module at boot time.
-    echo mali | sudo tee -a sdcard/etc/modules
-
 fi # if [ $TARGETARCH = armhf ]
+
+} # build_mali_module ()
+
+# ==========================================
+make_u_boot_script () {
+
+echo " "
+echo "make U-Boot boot script"  
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+
+( cd sdcard/boot ; 
+echo "# setenv bootm_boot_mode sec
+setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1
+ext2load mmc 0 0x43000000 sun7i-a20-cubieboard2.dtb
+# Building the initrd is broken. The kernel boots without initrd just fine.
+# ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
+ext2load mmc 0 0x41000000 vmlinuz-$LINUX_VERSION
+# Skip the initrd in the boot command.
+# bootz 0x41000000 0x44000000 0x43000000
+bootz 0x41000000 - 0x43000000" |sudo tee boot.cmd || cleanup_and_exit_error
+
+echo " "
+echo "Make boot script boot.scr from boot.cmd"
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+sudo mkimage -A arm -T script -C none -d boot.cmd boot.scr || cleanup_and_exit_error
+)  || cleanup_and_exit_error
+
+echo " "
+echo "Add boot script and device tree to the debian installer image"
+if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
+then
+    sudo cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $BUILDDIR/kernel/debian/tmp/boot
+    sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb $BUILDDIR/kernel/debian/tmp/boot
+else
+    sudo cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $BUILDDIR/kernel/debian/linux-image/boot
+    sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb $BUILDDIR/kernel/debian/linux-image/boot
+fi
+
+} # make_u_boot_script ()
+
+# ==========================================
+update_kernel_deb_package () {
 
 if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
 fi
+
+
+(
+    echo " "
+    echo "Re-build the linux image package including MALI and boot script"
+    cd $BASEDIR/$BUILDDIR/kernel
+    if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
+    then
+        dpkg-deb --root-owner-group  --build "debian/tmp" .. || exit 1
+    else
+        dpkg-deb --root-owner-group  --build "debian/linux-image" .. || exit 1
+    fi
+)
+
+} # update_kernel_deb_package ()
+
+# ==========================================
+install_kernel_deb () {
+
+echo " "
+echo "Install kernel and modules and headers"
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+
+(
+
+# delete the debug kernel images when they exist
+rm -fv $BUILDDIR/linux-image-$LINUX_VERSION-dbg*.deb
+
+# Clean the boot scripts and device tree. They are now supposed to come with the Debian installer
+sudo rm -vf sdcard/boot/boot.cmd sdcard/boot/boot.scr sdcard/boot/sun7i-a20-cubieboard2.dtb
+
+sudo cp -v $BUILDDIR/linux-*$LINUX_VERSION*.deb sdcard
+
+sudo chroot sdcard bin/bash -c "dpkg -i linux-image-$LINUX_VERSION*.deb linux-headers-$LINUX_VERSION*.deb linux-libc-dev_$LINUX_VERSION*.deb" || exit 1
+
+) || cleanup_and_exit_error  
+
+# Assign group "video" to the mali device node.
+sudo cp -v setup-ubuntu/etc/udev/rules.d/50-mali.rules sdcard/etc/udev/rules.d/
+# load the MALI module at boot time.
+echo mali | sudo tee -a sdcard/etc/modules
+
+} # install_kernel_deb ()
+
+# ==========================================
+install_linux_firmware () {
 
 echo " "
 echo "Install Linux firmware"
-sudo chroot sdcard /bin/bash -c "apt-get -y install linux-firmware" || cleanup_and_exit_error
-
 if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
 fi
 
-echo "Copy Ubuntu installation instructions and support files to sdcard/boot/setup-ubuntu.tgz" 
-sudo tar -czf sdcard/boot/setup-ubuntu.tgz setup-ubuntu/ || cleanup_and_exit_error
+sudo chroot sdcard /bin/bash -c "apt-get -y install linux-firmware" || cleanup_and_exit_error
+
+} # install_linux_firmware ()
+
+# ==========================================
+copy_installation_support () {
+
+echo "Copy Ubuntu installation instructions and support files to /usr/share/doc/horOpenVario on the target" 
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+sudo mkdir -p sdcard/usr/share/doc/horOpenVario
+sudo cp -Rv --preserve=mode,timestamps setup-ubuntu/* sdcard/usr/share/doc/horOpenVario || cleanup_and_exit_error
+# sudo tar -czf sdcard/boot/setup-ubuntu.tgz setup-ubuntu/ || cleanup_and_exit_error
 
 #echo "Copy boot environment ot SD card image"  
 #sudo cp -v build/boot/* sdcard/boot || cleanup_and_exit_error
-df
 
-if test $no_pause = 0
-then
-echo "Hit enter to continue"
-read x
-fi
+} # copy_installation_support ()
+
+# ==========================================
+install_u_boot () {
 
 if [ $TARGETARCH = armhf ]
 then
 
 echo " "
 echo "Copy U-Boot to the SD image"
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
 sudo dd if=$BUILDDIR/u-boot/u-boot-sunxi-with-spl.bin of=/dev/loop5 bs=1024 seek=8 || cleanup_and_exit_error
 
 fi # if [ $TARGETARCH = armhf ]
-#exit 0
+
+} # install_u_boot ()
+
+# ==========================================
+install_dev_packages () {
 
 # write the list of required packages for development and compiling openEVario and XCSoar
 # into a text file for immediate or later installation.
@@ -640,7 +743,7 @@ echo " "
 echo "Do you want to install the XCSoar build components on your computer,"
 echo "and on the target image? [Y|n]"
 echo "  You can use the installed components on the image also for"
-echo "  cross-compiling XCSoar for the cubieboard2"
+echo "  cross-compiling XCSoar for the Cubieboard2"
 read x
 if [ y$x = yy -o y$x = yY -o y$x = y ]
 then
@@ -656,94 +759,100 @@ sudo apt-get -y install \
     
 fi # Do you want to install the XCSoar build components?
 
-if test $no_pause = 0
-then
-echo "Hit enter to continue"
-read x
-fi
+} # install_dev_packages ()
+
+# ==========================================
+config_locale_keyboard () {
 
 echo " "
 echo "Configure locales and time zone and keyboard"
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+sudo chroot sdcard /bin/bash -c "apt-get -y update"
+sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
 sudo chroot sdcard /bin/bash -c "apt-get -y install locales keyboard-configuration console-setup"
-sudo chroot sdcard /bin/bash -c "dpkg-reconfigure locales"
 sudo chroot sdcard /bin/bash -c "dpkg-reconfigure tzdata"
+sudo chroot sdcard /bin/bash -c "dpkg-reconfigure locales"
 sudo chroot sdcard /bin/bash -c "dpkg-reconfigure keyboard-configuration"
+sudo chroot sdcard /bin/bash -c "apt-get -y update"
+sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
 
+} # config_locale_keyboard ()
+
+# ==========================================
+build_mali_blob_deb () {
+
+local MALI_VERSION=$1
+local MALI_PATCH=$2
+local INSTALL_MALI_BLOB=$3
+
+echo " "
+echo "Build the Debian installer for the Mali R${MALI_VERSION}P${MALI_PATCH} blob and includes"
 if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
 fi
 
-echo " "
-echo "Build the Debian installer for the Mali R6P2 blob and includes"
 sudo rm -rf build/mali-deb/* || cleanup_and_exit_error
-mkdir build/mali-deb/DEBIAN || cleanup_and_exit_error
+mkdir -p build/mali-deb/DEBIAN || cleanup_and_exit_error
 echo "Package: arm-mali-400-fbdev-blob
-Version: 6.2
+Version: $MALI_VERSION.$MALI_PATCH
 Section: custom
 Priority: optional
 Architecture: armhf
 Essential: no
 Installed-Size: 1060
 Maintainer: https://github.com/hor63/horOpenVario
-Description: MALI R6P2 userspace blob for fbdev device" > build/mali-deb/DEBIAN/control
+Description: MALI R${MALI_VERSION}P${MALI_PATCH} userspace blob for fbdev device" > build/mali-deb/DEBIAN/control
 
 mkdir build/mali-deb/usr || cleanup_and_exit_error
 mkdir build/mali-deb/usr/include || cleanup_and_exit_error
 mkdir build/mali-deb/usr/lib || cleanup_and_exit_error
 mkdir build/mali-deb/usr/lib/arm-linux-gnueabihf || cleanup_and_exit_error
 cp -Rpv src/mali-blobs/include/fbdev/* build/mali-deb/usr/include/ || cleanup_and_exit_error
-cp -Rpv src/mali-blobs/r6p2/arm/fbdev/lib* build/mali-deb/usr/lib/arm-linux-gnueabihf/ || cleanup_and_exit_error
+cp -Rpv src/mali-blobs/r${MALI_VERSION}p${MALI_PATCH}/arm/fbdev/lib* build/mali-deb/usr/lib/arm-linux-gnueabihf/ || cleanup_and_exit_error
 find build/mali-deb/usr/ -type d |xargs chmod -v 755 
 find build/mali-deb/usr/include -type f |xargs chmod -v 644
 find build/mali-deb/usr/lib -type f |xargs chmod -v 755
 dpkg-deb --root-owner-group --build build/mali-deb || cleanup_and_exit_error
-sudo mv -v build/mali-deb.deb sdcard/mali-deb-R6P2.deb || cleanup_and_exit_error
+sudo mv -v build/mali-deb.deb sdcard/mali-deb-R${MALI_VERSION}P${MALI_PATCH}.deb || cleanup_and_exit_error
 
-#echo " "
-#echo "Install the Mali R6P2 blob and includes"
-#sudo chroot sdcard bin/bash -c "dpkg -i mali-deb-R6P2.deb" || cleanup_and_exit_error
+if [ "y$INSTALL_MALI_BLOB" = yy ]
+then
+  echo " "
+  echo "Install the Mali R${MALI_VERSION}P${MALI_PATCH} blob and includes"
+  if test $no_pause = 0
+  then
+  echo "Hit enter to continue"
+  read x
+  fi
+  sudo chroot sdcard bin/bash -c "dpkg -i mali-deb-R${MALI_VERSION}P${MALI_PATCH}.deb" || cleanup_and_exit_error
+fi # if [ "y$INSTALL_MALI_BLOB" = yy ]  
 
+} # build_mali_blob_deb ()
+
+# ==========================================
+finish_installation () {
+
+echo " "
+echo "Install man pages"
 if test $no_pause = 0
 then
 echo "Hit enter to continue"
 read x
 fi
-
-echo " "
-echo "Build the Debian installer for the Mali R8P1 blob and includes"
-sudo rm -rf build/mali-deb/* || cleanup_and_exit_error
-mkdir build/mali-deb/DEBIAN || cleanup_and_exit_error
-echo "Package: arm-mali-400-fbdev-blob
-Version: 8.1
-Section: custom
-Priority: optional
-Architecture: armhf
-Essential: no
-Installed-Size: 1060
-Maintainer: https://github.com/hor63/horOpenVario
-Description: MALI R8P1 userspace blob for fbdev device" > build/mali-deb/DEBIAN/control
-
-mkdir build/mali-deb/usr || cleanup_and_exit_error
-mkdir build/mali-deb/usr/include || cleanup_and_exit_error
-mkdir build/mali-deb/usr/lib || cleanup_and_exit_error
-mkdir build/mali-deb/usr/lib/arm-linux-gnueabihf || cleanup_and_exit_error
-cp -Rpv src/mali-blobs/include/fbdev/* build/mali-deb/usr/include/ || cleanup_and_exit_error
-cp -Rpv src/mali-blobs/r8p1/arm/fbdev/lib* build/mali-deb/usr/lib/arm-linux-gnueabihf/ || cleanup_and_exit_error
-find build/mali-deb/usr/ -type d |xargs chmod -v 755 
-find build/mali-deb/usr/include -type f |xargs chmod -v 644
-find build/mali-deb/usr/lib -type f |xargs chmod -v 755
-dpkg-deb --root-owner-group --build build/mali-deb || cleanup_and_exit_error
-sudo mv -v build/mali-deb.deb sdcard/mali-deb-R8P1.deb || cleanup_and_exit_error
-
-echo " "
-echo "Install the Mali R8P1 blob and includes"
-sudo chroot sdcard bin/bash -c "dpkg -i mali-deb-R8P1.deb" || cleanup_and_exit_error
-
-
+sudo chroot sdcard /bin/bash -c "apt-get -y install man-db"
 echo " "
 echo "Update the installation again"
+if test $no_pause = 0
+then
+echo "Hit enter to continue"
+read x
+fi
 sudo chroot sdcard /bin/bash -c "apt-get -y update"
 sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
 
@@ -765,6 +874,43 @@ sudo umount sdcard/dev
 sudo umount sdcard/boot
 sudo umount sdcard
 sudo losetup -d /dev/loop5
-#exit 0
+
+} # finish_installation ()
+
+# ==========================================
+# == Start of the main program =============
+# ==========================================
+
+select_arch_and_distribution
+
+echo " "
+echo "BASEDIR = $BASEDIR"
+export BASEDIR
+cd $BASEDIR
+
+echo "Selected distribution is $distris"
+echo " "
+
+install_build_packages
+create_partition_sd_image
+format_mount_sd_image
+download_base_system_tarball
+install_base_system
+update_complete_base_system
+install_network_management
+rebuild_u_boot
+build_kernel_deb
+build_mali_module
+make_u_boot_script
+update_kernel_deb_package
+install_kernel_deb
+install_linux_firmware
+copy_installation_support
+install_u_boot
+config_locale_keyboard
+build_mali_blob_deb 6 2
+build_mali_blob_deb 8 1 y
+finish_installation
+
 echo "Copy the SD card image \"sd.img\" to the SD card raw device"  
 echo " ----------------- Done -------------------------"
