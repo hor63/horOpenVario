@@ -651,7 +651,7 @@ then
 # Mesa is incompatible with Mali on the target device.
 # Cross tools are useless on the target machine.
 sudo apt-get -y install \
-    mesa-common-dev libgl1-mesa-dev libegl1-mesa-dev \
+    mesa-common-dev libgl1-mesa-dev libegl1-mesa-dev libgbm-dev \
     crossbuild-essential-armhf || cleanup_and_exit_error
     
 fi # Do you want to install the XCSoar build components?
