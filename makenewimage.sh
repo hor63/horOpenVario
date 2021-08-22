@@ -78,15 +78,6 @@ case $TARGETARCH in
         ;;
     esac
 
-no_pause=0
-if test x"$1" = "x--no-pause"
-then
-	no_pause=1
-fi
-
-BASEDIR=`dirname $0`
-BASEDIR="`(cd \"$BASEDIR\" ; BASEDIR=\`pwd\`; echo \"$BASEDIR\")`"
-
 while test -z "$distris"
 do
 
@@ -265,7 +256,7 @@ then
 fi
 
 echo " "
-echo "Create the root file system for $distris distribution with"
+echo "Create the root file system for $distris distribution with:"
 echo "\"sudo debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACHE $distris sdcard \""
 if test $no_pause = 0
 then
@@ -881,7 +872,15 @@ sudo losetup -d /dev/loop5
 # == Start of the main program =============
 # ==========================================
 
-select_arch_and_distribution
+no_pause=0
+if test x"$1" = "x--no-pause"
+then
+	no_pause=1
+fi
+
+BASEDIR=`dirname $0`
+BASEDIR="`(cd \"$BASEDIR\" ; BASEDIR=\`pwd\`; echo \"$BASEDIR\")`"
+
 
 echo " "
 echo "BASEDIR = $BASEDIR"
@@ -891,6 +890,7 @@ cd $BASEDIR
 echo "Selected distribution is $distris"
 echo " "
 
+select_arch_and_distribution
 install_build_packages
 create_partition_sd_image
 format_mount_sd_image
