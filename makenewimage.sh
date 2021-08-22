@@ -121,7 +121,7 @@ install_build_packages () {
 echo ""
 echo "Install required packages for building U-Boot, the kernel,"
 echo "and the root file system."
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -156,7 +156,7 @@ sudo apt-get install -y \
 create_partition_sd_image () {
 echo ""
 echo "Create and partition the SD image"
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -186,7 +186,7 @@ format_mount_sd_image () {
 
 echo " "  
 echo "Format and mount the SD image"  
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -210,7 +210,7 @@ download_base_system_tarball () {
 
 echo " "
 echo "Download the base installation as tarball"
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -222,7 +222,7 @@ echo "DEBOOTSTRAP_CACHE=$DEBOOTSTRAP_CACHE"
 
 if [ -f $DEBOOTSTRAP_CACHE ]
 then
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
     echo " "
     echo "The root file system cache $DEBOOTSTRAP_CACHE is already here."
@@ -258,7 +258,7 @@ fi
 echo " "
 echo "Create the root file system for $distris distribution with:"
 echo "\"sudo debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACHE $distris sdcard \""
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -310,7 +310,7 @@ fi
 
 echo " "
 echo "Update the repository sources"
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -336,7 +336,7 @@ fi
 
 echo " "
 echo "Update the installation"
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -345,7 +345,7 @@ fi
 sudo chroot sdcard /bin/bash -c "apt-get -y update"
 sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
 
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -379,16 +379,18 @@ echo "Install initramfs tools"
 echo "Install bash suggestions of packages to install for missing commands"
 echo "Install bash completion"
 echo "Install U-Boot tools"
-if test $no_pause = 0
+echo "Install zeroconfig components and parted"
+echo "Install net-tools nfs and ssh server"
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
 fi
-sudo chroot sdcard /bin/bash -c "apt-get -y install initramfs-tools command-not-found bash-completion u-boot-tools" || cleanup_and_exit_error
-
-echo " "
-echo "Install zeroconfig components and parted"
-sudo chroot sdcard /bin/bash -c "apt-get -y install avahi-daemon avahi-discover libnss-mdns parted" || cleanup_and_exit_error
+sudo chroot sdcard /bin/bash -c "apt-get -y install initramfs-tools command-not-found bash-completion u-boot-tools \
+    avahi-daemon avahi-utils libnss-mdns parted \
+    nfs-common \
+    net-tools ifupdown \
+    openssh-server" || cleanup_and_exit_error
 
 } # update_complete_base_system ()
 
@@ -410,7 +412,7 @@ if [ y$x = "yw" ]
 then
     sudo chroot sdcard /bin/bash -c "apt-get -y install wicd-cli wicd-curses wicd-daemon" || cleanup_and_exit_error
 
-    if test $no_pause = 0
+    if test $NO_PAUSE = 0
     then
         echo "Hit enter to continue"
         read x
@@ -421,18 +423,31 @@ if [ y$x = "yn" ]
 then
     sudo chroot sdcard /bin/bash -c "apt-get -y install network-manager" || echo "Please run \"apt-get reinstall network-manager\" after booting the target device."
     echo "Please run \"nmtui\" to configure the network after booting the target device"
-    if test $no_pause = 0
+    if test $NO_PAUSE = 0
     then
         echo "Hit enter to continue"
         read x
     fi
 fi
+
+# Allow network connection by USB tethering (e.g. an Android phone) to come up automatically
+# Allow the built-in Ethernet interface to come up automatically
+echo "auto usb0
+allow-hotplug usb0
+iface usb0 inet dhcp
+iface usb0 inet6 auto
+
+auto eth0
+allow-hotplug eth0
+iface eth0 inet dhcp
+iface eth0 inet6 auto" | sudo tee -a sdcard/etc/network/interfaces
+
 } # install_network_management ()
 
 # ==========================================
 rebuild_u_boot () {
 
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -452,7 +467,7 @@ build_kernel_deb () {
 ( 
   echo " "
   echo "Rebuild the kernel"
-  if test $no_pause = 0
+  if test $NO_PAUSE = 0
   then
   echo "Hit enter to continue"
   read x
@@ -490,6 +505,27 @@ echo "LINUX_VERSION = $LINUX_VERSION"
 
 } # build_kernel_deb ()
 
+
+
+# ==========================================
+blacklist_module () {
+
+    local MODULE_NAME=$1
+
+    echo " "
+    echo "Blacklist the ${MODULE_NAME} module"
+    if test $NO_PAUSE = 0
+    then
+      echo "Hit enter to continue"
+      read x
+    fi
+
+    echo "blacklist ${MODULE_NAME}" | sudo tee sdcard/etc/modprobe.d/blacklist-${MODULE_NAME}.conf
+    
+} # blacklist_lima
+
+
+
 # ==========================================
 build_mali_module () {
 
@@ -499,7 +535,7 @@ then
     ( 
     echo " "
     echo "Build the Mali kernel module"
-    if test $no_pause = 0
+    if test $NO_PAUSE = 0
     then
       echo "Hit enter to continue"
       read x
@@ -517,7 +553,7 @@ then
     ( 
     echo " "
     echo "Install the Mali kernel module in the kernel DEB image"
-    if test $no_pause = 0
+    if test $NO_PAUSE = 0
     then
     echo "Hit enter to continue"
     read x
@@ -547,7 +583,7 @@ make_u_boot_script () {
 
 echo " "
 echo "make U-Boot boot script"  
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -566,7 +602,7 @@ bootz 0x41000000 - 0x43000000" |sudo tee boot.cmd || cleanup_and_exit_error
 
 echo " "
 echo "Make boot script boot.scr from boot.cmd"
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -590,7 +626,7 @@ fi
 # ==========================================
 update_kernel_deb_package () {
 
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -616,7 +652,7 @@ install_kernel_deb () {
 
 echo " "
 echo "Install kernel and modules and headers"
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -638,8 +674,6 @@ sudo chroot sdcard bin/bash -c "dpkg -i linux-image-$LINUX_VERSION*.deb linux-he
 
 # Assign group "video" to the mali device node.
 sudo cp -v setup-ubuntu/etc/udev/rules.d/50-mali.rules sdcard/etc/udev/rules.d/
-# load the MALI module at boot time.
-echo mali | sudo tee -a sdcard/etc/modules
 
 } # install_kernel_deb ()
 
@@ -648,7 +682,7 @@ install_linux_firmware () {
 
 echo " "
 echo "Install Linux firmware"
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -662,7 +696,7 @@ sudo chroot sdcard /bin/bash -c "apt-get -y install linux-firmware" || cleanup_a
 copy_installation_support () {
 
 echo "Copy Ubuntu installation instructions and support files to /usr/share/doc/horOpenVario on the target" 
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -684,7 +718,7 @@ then
 
 echo " "
 echo "Copy U-Boot to the SD image"
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -723,13 +757,12 @@ echo " build-essential
     libxml-parser-perl
     libasound2-dev alsa-base alsaplayer-text alsa-tools alsa-utils
     librsvg2-bin xsltproc
-    imagemagick gettext
     libinput-dev
-    fonts-dejavu
-    nfs-common
-    net-tools
-    openssh-server" | sudo tee sdcard/dev-packages.txt > /dev/null
+    fonts-dejavu" | sudo tee sdcard/dev-packages.txt > /dev/null
 
+echo " mesa-common-dev libgles2-mesa-dev libgl1-mesa-dev \
+    libegl1-mesa-dev libgbm-dev" | sudo tee sdcard/mesa-dev-packages.txt > /dev/null
+    
 echo " "
 echo "Do you want to install the XCSoar build components on your computer,"
 echo "and on the target image? [Y|n]"
@@ -741,12 +774,16 @@ then
   sudo chroot sdcard /bin/bash -c "cat /dev-packages.txt |xargs apt-get -y install " || cleanup_and_exit_error
 
   cat sdcard/dev-packages.txt | xargs sudo apt-get -y install || cleanup_and_exit_error
+  
+  if $WITH_MALI = 0
+  then
+    sudo chroot sdcard /bin/bash -c "cat /mesa-dev-packages.txt |xargs apt-get -y install " || cleanup_and_exit_error
+  fi
 
 # Mesa is incompatible with Mali on the target device.
 # Cross tools are useless on the target machine.
-sudo apt-get -y install \
-    mesa-common-dev libgl1-mesa-dev libegl1-mesa-dev libgbm-dev \
-    crossbuild-essential-armhf || cleanup_and_exit_error
+  cat sdcard/mesa-dev-packages.txt | \
+    xargs sudo apt-get -y install crossbuild-essential-armhf || cleanup_and_exit_error
     
 fi # Do you want to install the XCSoar build components?
 
@@ -757,7 +794,7 @@ config_locale_keyboard () {
 
 echo " "
 echo "Configure locales and time zone and keyboard"
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -782,7 +819,7 @@ local INSTALL_MALI_BLOB=$3
 
 echo " "
 echo "Build the Debian installer for the Mali R${MALI_VERSION}P${MALI_PATCH} blob and includes"
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -816,12 +853,16 @@ if [ "y$INSTALL_MALI_BLOB" = yy ]
 then
   echo " "
   echo "Install the Mali R${MALI_VERSION}P${MALI_PATCH} blob and includes"
-  if test $no_pause = 0
+  if test $NO_PAUSE = 0
   then
   echo "Hit enter to continue"
   read x
   fi
   sudo chroot sdcard bin/bash -c "dpkg -i mali-deb-R${MALI_VERSION}P${MALI_PATCH}.deb" || cleanup_and_exit_error
+  
+  # load the MALI module at boot time.
+  echo mali | sudo tee -a sdcard/etc/modules > /dev/null
+
 fi # if [ "y$INSTALL_MALI_BLOB" = yy ]  
 
 } # build_mali_blob_deb ()
@@ -831,15 +872,17 @@ finish_installation () {
 
 echo " "
 echo "Install man pages"
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
-fi
+fiif $WITH_MALI = 1
+then
+
 sudo chroot sdcard /bin/bash -c "apt-get -y install man-db"
 echo " "
-echo "Update the installation again"
-if test $no_pause = 0
+echo "Update the installation finally"
+if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
@@ -847,7 +890,7 @@ fi
 sudo chroot sdcard /bin/bash -c "apt-get -y update"
 sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
 
-if test $no_pause = 0
+if test $NO_PAUSE = 0
 then
 echo " "
 echo "--------------  Almost done --------------------"
@@ -872,10 +915,16 @@ sudo losetup -d /dev/loop5
 # == Start of the main program =============
 # ==========================================
 
-no_pause=0
-if test x"$1" = "x--no-pause"
+NO_PAUSE=0
+if test x"$1" = "x--no-pause" || test x"$2" = "x--no-pause"
 then
-	no_pause=1
+	NO_PAUSE=1
+fi
+
+WITH_MALI=1
+if test x"$1" = "x--no-mali" || test x"$2" = "x--no-mali"
+then
+	WITH_MALI=0
 fi
 
 BASEDIR=`dirname $0`
@@ -907,9 +956,20 @@ install_kernel_deb
 install_linux_firmware
 copy_installation_support
 install_u_boot
+install_dev_packages
 config_locale_keyboard
 build_mali_blob_deb 6 2
-build_mali_blob_deb 8 1 y
+if $WITH_MALI = 1
+then
+    # build AND install the blob, and headers.
+    build_mali_blob_deb 8 1 y
+    # Prevent the lima module from colliding with mali
+    blacklist_module lima
+else
+    build_mali_blob_deb 8 1
+    # Prevent the mali module from colliding with lima
+    blacklist_module mali
+fi
 finish_installation
 
 echo "Copy the SD card image \"sd.img\" to the SD card raw device"  
