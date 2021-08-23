@@ -432,12 +432,14 @@ fi
 
 # Allow network connection by USB tethering (e.g. an Android phone) to come up automatically
 # Allow the built-in Ethernet interface to come up automatically
-echo "auto usb0
+# Do not start them at boot time. When Ethernet is not connected system startup is stuck
+# for agonizing 5 minutes. Let udev hotplug handle the startup.
+echo "# auto usb0
 allow-hotplug usb0
 iface usb0 inet dhcp
 iface usb0 inet6 auto
 
-auto eth0
+# auto eth0
 allow-hotplug eth0
 iface eth0 inet dhcp
 iface eth0 inet6 auto" | sudo tee -a sdcard/etc/network/interfaces
@@ -522,7 +524,26 @@ blacklist_module () {
 
     echo "blacklist ${MODULE_NAME}" | sudo tee sdcard/etc/modprobe.d/blacklist-${MODULE_NAME}.conf
     
-} # blacklist_lima
+} # blacklist_module
+
+
+
+# ==========================================
+load_module () {
+
+    local MODULE_NAME=$1
+
+    echo " "
+    echo "Load the ${MODULE_NAME} module upon boot time"
+    if test $NO_PAUSE = 0
+    then
+      echo "Hit enter to continue"
+      read x
+    fi
+
+    echo "${MODULE_NAME}" | sudo tee -a sdcard/etc/modules
+
+} # load_module
 
 
 
@@ -775,7 +796,7 @@ then
 
   cat sdcard/dev-packages.txt | xargs sudo apt-get -y install || cleanup_and_exit_error
   
-  if $WITH_MALI = 0
+  if test $WITH_MALI = 0
   then
     sudo chroot sdcard /bin/bash -c "cat /mesa-dev-packages.txt |xargs apt-get -y install " || cleanup_and_exit_error
   fi
@@ -876,10 +897,10 @@ if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
-fiif $WITH_MALI = 1
-then
+fi
 
 sudo chroot sdcard /bin/bash -c "apt-get -y install man-db"
+
 echo " "
 echo "Update the installation finally"
 if test $NO_PAUSE = 0
@@ -958,6 +979,7 @@ copy_installation_support
 install_u_boot
 install_dev_packages
 config_locale_keyboard
+load_module sun4i-codec
 build_mali_blob_deb 6 2
 if $WITH_MALI = 1
 then
@@ -965,10 +987,12 @@ then
     build_mali_blob_deb 8 1 y
     # Prevent the lima module from colliding with mali
     blacklist_module lima
+    load_module mali
 else
     build_mali_blob_deb 8 1
     # Prevent the mali module from colliding with lima
     blacklist_module mali
+    load_module lima
 fi
 finish_installation
 
