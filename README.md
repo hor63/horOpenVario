@@ -1,15 +1,30 @@
 *This file is part of horOpenVario*
 
-*Copyright (C) 2017  Kai Horstmann <horstmannkai@hotmail.com>*
+*Copyright (C) 2017-2021  Kai Horstmann*
 
 # Open Vario on Cubieboard 2 running Ubuntu
 ## horOpenVario
 
 This repository is the main repository of [horOpenVario](https://github.com/hor63/horOpenVario.git).
 
-This build system builds a Linux kernel for a *Cubiebaord 2* with an Allwinner A20 (sun7i) SOC.
+This build system builds a complete Linux installation for a *Cubiebaord 2* with an Allwinner A20 (sun7i) SOC.   
+It is intended to run [XCSoar](https://xcsoar.org)
 
-The system creates a SD card image which permits installing an Ubuntu Core system on the same SD card.
+This build system creates a SD card image containing a ready-to-run Linux system.
+It includes
+- The SD card image itself contains the /boot and root partition. 
+- U-Boot binary image installed at the start of the image before the boot partition.
+- A vanilla 5.10 LTS Linux kernel, currently the recent patch 58.
+- Vanilla Ubuntu LTS 2.004 (Focal) installation with
+  - Text mode only
+  - Networking for USB tethering, Ethernet, and multiple WiFi USB sticks (particularly Realtec).
+  - Complete development package to compile XCSoar directly on the Cubieboard
+  - **Working** OpenGL ES 2.0 Mali acceleration either with
+    -  Closed-source MALI blob, and out-of-tree Mali driver
+    -  Open-source LIMA driver in the kernel, and Mesa client side (Ubuntu Focal already brings a version of Mesa with working Lima driver)
+
+
+## Checkout the repository
 
 This repository requires a number of git submodules.
 Therefore check it out either with
@@ -24,18 +39,55 @@ or initialize and load the sub-modules separately.
   git submodule update
 ```
 
+## Prerequisites and systems
+
+My host system for buildng is Ubuntu 20.04 (Focal). This has the advantage that it is the identical version as the target system in the SD card image.
+This makes cross-compilation rather painless because compiler and runtime libs in the target system are fitting seamlessly.
+
+To work with Debian and other Debian-based systems as host and/or target system should be rather simple. They also use DEB packages and APT for installation.
+The package names should be identical or at least similar.   
+For Fedora, OpenSuse and the likes your mileage may vary.   
+And don't even start with OpenEmbedded & Co. I have no idea how that may work :upside_down_face:
 
 ## Build
-To perform a complete build run `./makenewimage.sh`. Decide which Ubuntu version you want to install.
-Wait.
+
+To perform a complete build run `./makenewimage.sh`.
+Options are:
+- `--no-pause`: Do not stop before every step of the build process but run as much as possible automatically. Stop only when a real input is required.
+- `--no-mali`: Do not load the `mali` module for the closed-source Mali blob at boot time. Instead start the system with the `lima` module. By default a system is being built where the proprietary Mali from ARM is being used.   
+  Please note that even with --no-mali the Mali kernel module is being built and installed. It is just blacklisted. Instead the open-source Lima module is loaded by default.
+  Also the proprietary Mali blob is provided in the root directory as .deb image when you later decide to switch from Lima to Mali.
+
+Without `--no-pause` the script will stop at any step and print a text explaining what comes next. Continue just hitting `Enter`.  
+Be careful not blindly hitting enter each time the script stops however. There are questions and actual input required along the way.  
+
+Questions which will be asked or options to be chosen are:
+- Select the Ubuntu version to be installed (Focal as current LTS version is default).
+- If you re-use a previously downloaded base installation tarball when you run `./makenewimage.sh` multiple times, or download it again (default is re-use).
+- `root` password of the new system. The system will have by default a working root user. Use it at your own risk.
+- Use of an APT proxy. It requires a working `apt-proxy-ng` installation in your network. Default is not using a cache.  
+  *Please note*: The proxy setting is being written to the APT configuration on the target image into ´/etc/apt/apt.conf.d/00aptproxy´. You may want to delete it once you have the Cubieboard up and running. In case you provide a real hostname, and valid port, and your Cubie can reach that machine you can continue using the cache.
+- Host name of the target machine. Chose a unique name within your network. No default. You have to enter a real name.
+- (text based) network management:
+  - **Network manager**. Use `nmtui` to configure WiFi networks. Default.
+  - **wicd-curses** *Obsolete*! This package only existed in `bionic`
+  - No network management at all. You need to install additional packages yourself, and perform the configuration manually.
+- If you want to install development tools for native building XCSoar (and other stuff) on the Cubieboard. Default Yes.
+- Interactively select the timezone in which the Cubie is located.
+- Interactively select the locale(s) you want to install. Select *at least* `en_US.UTF-8`. Otherwise you may get funny error messages, particularly from Python based stuff.
+- Select the keyboard type, and layout (English, German...).
+
 Then copy the newly created `sd.img` file onto the SD card e.g. with 
 ```
 dd if=sd.img of=/dev/mmcblk0 BS=1M
 ```
-Note that the device name of the SD card can vary. Best is to run `tail -f /var/log/syslog` in one command window while you insert the SD card.
-On some system SD cards can be listed as SCSI disk, e.g. /dev/sdc. Take great care to copy the SD card image with `dd` into the correct device.
-I once overwrote accidnenty the USB drive from which I run my build Linux system! :D
+**Note**: The device name of the SD card can vary. Best is to run `tail -f /var/log/syslog` in one command window after you insert the SD card.
+On some system SD cards can be listed as SCSI disk, e.g. `/dev/sdc`. Take great care to copy the SD card image with `dd` into the correct device.  
+I once overwrote accidently the USB drive from which I run my build Linux system! :facepalm:
 
-To install Ubuntu on the target Cubieboard 2 simply insert the SD card into the Cubieboard, connect USB keyboard and a HDMI monitor or TV.
-Power it up. Follow the installation instructions on the screen.
+To run the freshly installed Ubuntu system on the target Cubieboard 2 simply insert the SD card into the Cubieboard, connect USB keyboard and a HDMI monitor.  
+Power it up.
 
+**Enjoy, have fun with it.**
+
+More instructions to come soon.
