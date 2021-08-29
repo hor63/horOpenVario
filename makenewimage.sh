@@ -86,7 +86,8 @@ do
     echo "Enter:"
     echo "  a - Artful"
     echo "  b - Bionic - LTS"
-    echo "  f - Focal  - LTS (default)"
+    echo "  f - Focal  - LTS"
+    echo "  h - Hirsute  (default)"
     echo "  x - Xenial - LTS"
 
     read x
@@ -101,11 +102,14 @@ do
         yf)
             distris="focal"
             ;;
+        yh)
+            distris="hirsute"
+            ;;
         yx)
             distris="xenial"
             ;;
         y)
-            distris="focal"
+            distris="hirsute"
             ;;
         *)
             echo "Invalid input \"$x\"."
@@ -386,11 +390,14 @@ then
 echo "Hit enter to continue"
 read x
 fi
-sudo chroot sdcard /bin/bash -c "apt-get -y install initramfs-tools command-not-found bash-completion u-boot-tools \
+sudo chroot sdcard /bin/bash -c "apt-get -y install \
+    initramfs-tools u-boot-tools \
+    command-not-found bash-completion \
     avahi-daemon avahi-utils libnss-mdns parted \
     nfs-common \
     net-tools ifupdown \
-    openssh-server" || cleanup_and_exit_error
+    openssh-server \
+    bluetooth" || cleanup_and_exit_error
 
 } # update_complete_base_system ()
 
@@ -522,7 +529,7 @@ blacklist_module () {
       read x
     fi
 
-    echo "blacklist ${MODULE_NAME}" | sudo tee sdcard/etc/modprobe.d/blacklist-${MODULE_NAME}.conf
+    echo "blacklist ${MODULE_NAME}" | sudo tee sdcard/etc/modprobe.d/blacklist-mali.conf
     
 } # blacklist_module
 
@@ -541,7 +548,11 @@ load_module () {
       read x
     fi
 
-    echo "${MODULE_NAME}" | sudo tee -a sdcard/etc/modules
+    echo "${MODULE_NAME}" | sudo tee sdcard/etc/modules-load.d/mali.conf
+    
+    sudo cp switch-to-lima.sh switch-to-mali.sh sdcard
+    sudo chmod a-x sdcard/switch-to-lima.sh sdcard/switch-to-mali.sh
+    sudo chmod u+x sdcard/switch-to-lima.sh sdcard/switch-to-mali.sh
 
 } # load_module
 
@@ -781,6 +792,12 @@ echo " build-essential
     libinput-dev
     fonts-dejavu" | sudo tee sdcard/dev-packages.txt > /dev/null
 
+    if test $distris = "hirsute"
+    then
+    echo "liblua5.4-dev lua5.4" | sudo tee -a sdcard/dev-packages.txt > /dev/null
+    fi
+
+    
 echo " mesa-common-dev libgles2-mesa-dev libgl1-mesa-dev \
     libegl1-mesa-dev libgbm-dev" | sudo tee sdcard/mesa-dev-packages.txt > /dev/null
     
