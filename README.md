@@ -22,7 +22,7 @@ It includes
   - Complete development package to compile XCSoar directly on the Cubieboard
   - **Working** OpenGL ES 2.0 Mali acceleration either with
     -  Closed-source MALI blob, and out-of-tree Mali driver
-    -  Open-source LIMA driver in the kernel, and Mesa client side (Ubuntu Focal already brings a version of Mesa with working Lima driver)
+    -  Open-source LIMA driver in the kernel, and Mesa client side (Ubuntu Focal and Hirsute already bring a version of Mesa with working Lima driver)
 
 
 ## Checkout the repository
@@ -63,7 +63,7 @@ Without `--no-pause` the script will stop at any step and print a text explainin
 Be careful not blindly hitting enter each time the script stops however. There are questions and actual input required along the way.  
 
 Questions which will be asked or options to be chosen are:
-- Select the Ubuntu version to be installed (Focal as current LTS version is default).
+- Select the Ubuntu version to be installed (Hirsute (21.04) version is default. Required for the most recent XCSoar due to GCC and Lua version requirements).
 - If you re-use a previously downloaded base installation tarball when you run `./makenewimage.sh` multiple times, or download it again (default is re-use).
 - `root` password of the new system. The system will have by default a working root user. Use it at your own risk.
 - Use of an APT proxy. It requires a working `apt-proxy-ng` installation in your network. Default is not using a cache.  
@@ -95,13 +95,13 @@ Power it up.
 
 ## Switch between Mali and Lima
 
-You can switch between open-source Lima and closed source Mali blob on the target system. Simply run /switch-to-mali.sh or /switch-to-lima.sh as root, and re-boot.
+You can switch between open-source Lima and closed source Mali blob on the target system. Simply run `/switch-to-mali.sh` or `/switch-to-lima.sh` as root, and re-boot.
 
 ## Compile XCSoar
-When you install the development package on the image you can natively mainline XCSoar OOTB.
+When you install the development package on the image you can build mainline XCSoar OOTB on the Cubie. Just be patient but it works.
 
 ### For Mali
-When the Mali driver is active you simply run `make` (optionally with optimization). make finds the /dev/mali device, and compiles against the Mali blob.
+When the Mali driver is active you simply run `make` (optionally with DEBUG=n and -j2). `make` finds the /dev/mali device, and compiles against the Mali blob.
 
 ### For Lima
 As a first test you may want [download KMSCUBE from freedesktop.org](https://gitlab.freedesktop.org/mesa/kmscube.git) and compile it to verify if hardware acceleration with Lima is actually active and working. The program spits out a lot of information about EGL and OPENGL ES 2.0.
