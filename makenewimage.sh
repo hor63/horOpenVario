@@ -87,7 +87,8 @@ do
     echo "  a - Artful"
     echo "  b - Bionic - LTS"
     echo "  f - Focal  - LTS"
-    echo "  h - Hirsute  (default)"
+    echo "  h - Hirsute"
+    echo "  i - Impish  (default)"
     echo "  x - Xenial - LTS"
 
     read x
@@ -105,11 +106,14 @@ do
         yh)
             distris="hirsute"
             ;;
+        yi)
+            distris="impish"
+            ;;
         yx)
             distris="xenial"
             ;;
         y)
-            distris="hirsute"
+            distris="impish"
             ;;
         *)
             echo "Invalid input \"$x\"."
@@ -133,26 +137,7 @@ fi
 
 sudo apt-get update
 sudo apt-get install -y \
-    git \
-    build-essential \
-    crossbuild-essential-armhf \
-    bison \
-    flex \
-    gawk \
-    python \
-    python3 \
-    initramfs-tools \
-    command-not-found \
-    u-boot-tools \
-    dpkg \
-    parted \
-    debootstrap \
-    qemu-user-static \
-    bc \
-    rsync \
-    libssl-dev \
-    quilt \
-    avahi-daemon avahi-discover libnss-mdns
+  `cat build-packages.txt`
 } # install_build_packages ()
 
 

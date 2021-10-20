@@ -1,0 +1,21 @@
+git
+build-essential
+crossbuild-essential-armhf
+crossbuild-essential-armel
+bison
+flex
+gawk
+python
+python3
+initramfs-tools
+command-not-found
+u-boot-tools
+dpkg
+parted
+debootstrap
+qemu-user-static
+bc
+rsync
+libssl-dev
+quilt
+avahi-daemon avahi-discover libnss-mdns
