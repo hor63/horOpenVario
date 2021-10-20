@@ -15,7 +15,7 @@ It includes
 - The SD card image itself contains the /boot and root partition. 
 - U-Boot binary image installed at the start of the image before the boot partition.
 - A vanilla 5.10 LTS Linux kernel, currently the recent patch 58 compiled from sources
-- Vanilla Ubuntu LTS 21.04 (Hirsute) installation with debootstrap, featuring:
+- Vanilla Ubuntu LTS 21.10 (Impish) installation with debootstrap, featuring:
   - Text mode only
   - Networking for USB tethering e.g. with Android, Ethernet, and multiple WiFi USB sticks (particularly Realtec).
   - Bluetooth components and driver for BT USB dongle are installed but connecting to a Bluetooth hotspot is at this time completely manual.
