@@ -136,8 +136,17 @@ read x
 fi
 
 sudo apt-get update
-sudo apt-get install -y \
+sudo apt-get install \
   `cat build-packages.txt`
+
+# An ugly hack to downgrade qemu-user-static.
+# qemu-user-static has an fatal regression in Impish.
+CODENAME=`lsb_release -cs`
+if test "x$CODENAME" = ximpish
+then
+    sudo apt-get install qemu-user-static/hirsute || exit 1
+fi
+
 } # install_build_packages ()
 
 
@@ -269,33 +278,6 @@ echo " "
 echo "Please enter the new root password of the target image"
 sudo chroot sdcard /bin/bash -c "passwd root"
 
-echo " "
-echo "Do you want to use a local APT-Proxy? [y|N]"
-echo "  To use this feature you must have apt-proxy-ng installed."
-read x
-if [ y$x = yy -o y$x = yY ]
-then
-    APT_PROXY_HOST=localhost
-    APT_PROXY_PORT=3142
-
-    echo "Enter the proxy host [localhost]"
-    read x
-    if [ y$x != y ]
-    then
-        APT_PROXY_HOST="$x"
-    fi
-
-    echo "Enter the proxy port [3142]"
-    read x
-    if [ y$x != y ]
-    then
-        APT_PROXY_PORT="$x"
-    fi
-
-    echo "Acquire::http::Proxy \"http://$APT_PROXY_HOST:$APT_PROXY_PORT\";
-Acquire::https::Proxy \"http://$APT_PROXY_HOST:$APT_PROXY_PORT\";" | sudo tee sdcard/etc/apt/apt.conf.d/00aptproxy
-fi
-
 
 echo " "
 echo "Update the repository sources"
@@ -331,7 +313,37 @@ echo "Hit enter to continue"
 read x
 fi
 
+echo " "
+echo "Do you want to use a local APT-Proxy? [y|N]"
+echo "  To use this feature you must have apt-cacher installed."
+echo "  \"apt-cacher-ng\" does not work correctly. "
+echo "    If you have installed apt-cacher-ng answer \'n\'"
+read x
+if [ y$x = yy -o y$x = yY ]
+then
+    APT_PROXY_HOST=localhost
+    APT_PROXY_PORT=3142
+
+    echo "Enter the proxy host [localhost]"
+    read x
+    if [ y$x != y ]
+    then
+        APT_PROXY_HOST="$x"
+    fi
+
+    echo "Enter the proxy port [3142]"
+    read x
+    if [ y$x != y ]
+    then
+        APT_PROXY_PORT="$x"
+    fi
+
+    echo "Acquire::http::Proxy \"http://$APT_PROXY_HOST:$APT_PROXY_PORT\";
+Acquire::https::Proxy \"http://$APT_PROXY_HOST:$APT_PROXY_PORT\";" | sudo tee sdcard/etc/apt/apt.conf.d/00aptproxy
+fi
+
 sudo chroot sdcard /bin/bash -c "apt-get -y update"
+
 sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
 
 if test $NO_PAUSE = 0
@@ -560,9 +572,9 @@ then
     cd src/sunxi-mali
     
     # Clean the structure and prepare for a new build in case of a previous failure
-    CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -c >/dev/null 2>&1
+    CROSS_COMPILE=arm-linux-gnueabi- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -c >/dev/null 2>&1
 
-    CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -b || exit 1
+    CROSS_COMPILE=arm-linux-gnueabi- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -b || exit 1
 
     ) || cleanup_and_exit_error
 
@@ -577,12 +589,12 @@ then
     fi
     cd src/sunxi-mali
     
-    #sudo CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/sdcard ./build.sh -r r6p2 -i || cleanup_and_exit_error
+    #sudo CROSS_COMPILE=arm-linux-gnueabi- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/sdcard ./build.sh -r r6p2 -i || cleanup_and_exit_error
         if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
         then
-            CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/$BUILDDIR/kernel/debian/tmp ./build.sh -r r8p1 -i || exit 1
+            CROSS_COMPILE=arm-linux-gnueabi- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/$BUILDDIR/kernel/debian/tmp ./build.sh -r r8p1 -i || exit 1
         else
-            CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/$BUILDDIR/kernel/debian/linux-image ./build.sh -r r8p1 -i || exit 1
+            CROSS_COMPILE=arm-linux-gnueabi- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/$BUILDDIR/kernel/debian/linux-image ./build.sh -r r8p1 -i || exit 1
         fi
 
     # undo the patches. Otherwise the next build will fail because applying the patches is part of the build option of build.sh
