@@ -55,8 +55,9 @@ And don't even start with OpenEmbedded & Co. I have no idea how that may work :u
 To perform a complete build run `./makenewimage.sh`.
 Options are:
 - `--no-pause`: Do not stop before every step of the build process but run as much as possible automatically. Stop only when a real input is required.
-- `--no-mali`: Do not load the `mali` module for the closed-source Mali blob at boot time. Instead start the system with the `lima` module. By default a system is being built where the proprietary Mali from ARM is being used.   
-  Please note that even with --no-mali the Mali kernel module is being built and installed. It is just blacklisted. Instead the open-source Lima module is loaded by default.
+- `--with-mali`: Load the `mali` module for the closed-source Mali blob at boot time.  
+  By default start the system with the open-source `lima` module.   
+  Please note that even with --with-mali the OSS Lima kernel module is being built and installed. It is just blacklisted. Instead the cole-source Mali module is loaded by default.
   Also the proprietary Mali blob is provided in the root directory as .deb image when you later decide to switch from Lima to Mali.
 
 Without `--no-pause` the script will stop at any step and print a text explaining what comes next. Continue just hitting `Enter`.  

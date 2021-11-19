@@ -18,4 +18,5 @@ bc
 rsync
 libssl-dev
 quilt
+swig
 avahi-daemon avahi-discover libnss-mdns

@@ -135,8 +135,8 @@ echo "Hit enter to continue"
 read x
 fi
 
-sudo apt-get update
-sudo apt-get install \
+sudo apt-get update $APT_GET_OPT
+sudo apt-get install $APT_GET_OPT \
   `cat build-packages.txt`
 
 # An ugly hack to downgrade qemu-user-static.
@@ -144,7 +144,7 @@ sudo apt-get install \
 CODENAME=`lsb_release -cs`
 if test "x$CODENAME" = ximpish
 then
-    sudo apt-get install qemu-user-static/hirsute || exit 1
+    sudo apt-get install $APT_GET_OPT qemu-user-static/hirsute || exit 1
 fi
 
 } # install_build_packages ()
@@ -317,7 +317,7 @@ echo " "
 echo "Do you want to use a local APT-Proxy? [y|N]"
 echo "  To use this feature you must have apt-cacher installed."
 echo "  \"apt-cacher-ng\" does not work correctly. "
-echo "    If you have installed apt-cacher-ng answer \'n\'"
+echo "    If you have installed apt-cacher-ng answer 'n'"
 read x
 if [ y$x = yy -o y$x = yY ]
 then
@@ -789,7 +789,7 @@ echo " build-essential
     libinput-dev
     fonts-dejavu" | sudo tee sdcard/dev-packages.txt > /dev/null
 
-    if test $distris = "hirsute"
+    if test $distris = "hirsute" -o $distris = "impish"
     then
     echo "liblua5.4-dev lua5.4" | sudo tee -a sdcard/dev-packages.txt > /dev/null
     fi
@@ -954,12 +954,13 @@ NO_PAUSE=0
 if test x"$1" = "x--no-pause" || test x"$2" = "x--no-pause"
 then
 	NO_PAUSE=1
+	APT_GET_OPT="$APT_GET_OPT -y --allow-downgrades"
 fi
 
-WITH_MALI=1
-if test x"$1" = "x--no-mali" || test x"$2" = "x--no-mali"
+WITH_MALI=0
+if test x"$1" = "x--with-mali" || test x"$2" = "x--with-mali"
 then
-	WITH_MALI=0
+	WITH_MALI=1
 fi
 
 BASEDIR=`dirname $0`
