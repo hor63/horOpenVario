@@ -84,22 +84,17 @@ do
     echo " "
     echo "Selection of distributions which can be installed."
     echo "Enter:"
-    echo "  a - Artful"
-    echo "  b - Bionic - LTS"
     echo "  f - Focal  - LTS"
     echo "  h - Hirsute"
     echo "  i - Impish  (default)"
-    echo "  x - Xenial - LTS"
+    echo " "
+    echo " Debian releases:"
+    echo "  ds - Debian stable"
+    echo "  dt - Debian testing"
 
     read x
 
     case y"$x" in
-        ya)
-            distris="artful"
-            ;;
-        yb)
-            distris="bionic"
-            ;;
         yf)
             distris="focal"
             ;;
@@ -109,11 +104,11 @@ do
         yi)
             distris="impish"
             ;;
-        yx)
-            distris="xenial"
+        yds)
+            distris="stable"
             ;;
-        y)
-            distris="impish"
+        ydt)
+            distris="testing"
             ;;
         *)
             echo "Invalid input \"$x\"."
@@ -121,6 +116,13 @@ do
         ;;
     esac
 
+    if test $distris = "stable" -o $distris = "testing"
+    then
+      DEBIAN=1
+    else
+      DEBIAN=0
+    fi
+    
 done
 } # select_arch_and_distribution ()
 
@@ -291,18 +293,33 @@ if [ ! -f sdcard/etc/apt/sources.list.bak ]
 then
     sudo mv sdcard/etc/apt/sources.list sdcard/etc/apt/sources.list.bak || cleanup_and_exit_error
     (
-        cat sdcard/etc/apt/sources.list.bak | while read deb debserver distr package 
-        do
-            for i in main restricted universe multiverse
-            do
-                echo "deb $debserver $distr $i" 
-                for k in updates backports security
-                do
-                    echo "deb $debserver $distr-$k $i"  
-                done
-            done
-        done
-    ) | sudo tee sdcard/etc/apt/sources.list || cleanup_and_exit_error
+      # Debian has a different repository layout than Ubuntu
+      if test $distris = "stable" -o $distris = "testing"
+      then
+        REPOSITORIES="main non-free contrib"
+        if test $distris = "stable"
+        then
+          UPDATE_PKGS="updates backports backports-sloppy"
+        else
+          # testing
+          UPDATE_PKGS="updates backports"
+        fi
+      else
+        REPOSITORIES="main restricted universe multiverse"
+        UPDATE_PKGS="updates backports security"
+      fi
+      cat sdcard/etc/apt/sources.list.bak | while read deb debserver distr package 
+      do
+          for i in $REPOSITORIES
+          do
+              echo "deb $debserver $distr $i" 
+              for k in $UPDATE_PKGS
+              do
+                  echo "deb $debserver $distr-$k $i"  
+              done
+          done
+      done
+  ) | sudo tee sdcard/etc/apt/sources.list || cleanup_and_exit_error
 fi
 
 echo " "
@@ -491,12 +508,12 @@ build_kernel_deb () {
   then
     echo " "
     echo "Build the device tree image"
-    $BUILDDIR/kernel/build.sh dtbs || exit 1
+    KDEB_COMPRESS=gzip $BUILDDIR/kernel/build.sh dtbs || exit 1
   fi # if [ $TARGETARCH = armhf ]
 
   echo " "
   echo "Build Debian kernel package"
-  $BUILDDIR/kernel/build.sh -j8 bindeb-pkg || exit 1
+  KDEB_COMPRESS=gzip $BUILDDIR/kernel/build.sh -j8 bindeb-pkg || exit 1
   
 ) || cleanup_and_exit_error  
 
@@ -668,9 +685,9 @@ fi
     cd $BASEDIR/$BUILDDIR/kernel
     if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
     then
-        dpkg-deb --root-owner-group  --build "debian/tmp" .. || exit 1
+        dpkg-deb -Zgzip --root-owner-group  --build "debian/tmp" .. || exit 1
     else
-        dpkg-deb --root-owner-group  --build "debian/linux-image" .. || exit 1
+        dpkg-deb -Zgzip --root-owner-group  --build "debian/linux-image" .. || exit 1
     fi
 )
 
@@ -717,7 +734,17 @@ echo "Hit enter to continue"
 read x
 fi
 
-sudo chroot sdcard /bin/bash -c "apt-get -y install linux-firmware" || cleanup_and_exit_error
+if test $DEBIAN = 1
+then
+  FIRMWARE_PKG="firmware-atheros firmware-bnx2* \
+    firmware-brcm80211 firmware-libertas \
+    firmware-linux* firmware-misc-nonfree \
+    firmware-realtek firmware-ti-connectivity firmware-zd1211"
+else
+  FIRMWARE_PKG=linux-firmware
+fi
+
+sudo chroot sdcard /bin/bash -c "apt-get -y install $FIRMWARE_PKG" || cleanup_and_exit_error
 
 } # install_linux_firmware ()
 
@@ -784,12 +811,12 @@ echo " build-essential
     libc-ares-dev
     liblua5.2-dev lua5.2
     libxml-parser-perl
-    libasound2-dev alsa-base alsaplayer-text alsa-tools alsa-utils
+    libasound2-dev alsaplayer-text alsa-tools alsa-utils
     librsvg2-bin xsltproc
     libinput-dev
     fonts-dejavu" | sudo tee sdcard/dev-packages.txt > /dev/null
 
-    if test $distris = "hirsute" -o $distris = "impish"
+    if test $distris = "hirsute" -o $distris = "impish" -o $distris = "stable" -o $distris = "testing"
     then
     echo "liblua5.4-dev lua5.4" | sudo tee -a sdcard/dev-packages.txt > /dev/null
     fi
@@ -881,7 +908,7 @@ cp -Rpv src/mali-blobs/r${MALI_VERSION}p${MALI_PATCH}/arm/fbdev/lib* build/mali-
 find build/mali-deb/usr/ -type d |xargs chmod -v 755 
 find build/mali-deb/usr/include -type f |xargs chmod -v 644
 find build/mali-deb/usr/lib -type f |xargs chmod -v 755
-dpkg-deb --root-owner-group --build build/mali-deb || cleanup_and_exit_error
+dpkg-deb -Zgzip --root-owner-group --build build/mali-deb || cleanup_and_exit_error
 sudo mv -v build/mali-deb.deb sdcard/mali-deb-R${MALI_VERSION}P${MALI_PATCH}.deb || cleanup_and_exit_error
 
 if [ "y$INSTALL_MALI_BLOB" = yy ]
