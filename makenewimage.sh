@@ -137,8 +137,8 @@ echo "Hit enter to continue"
 read x
 fi
 
-sudo apt-get update $APT_GET_OPT
-sudo apt-get install $APT_GET_OPT \
+sudo apt-get $APT_GET_OPT update
+sudo apt-get $APT_GET_OPT  install \
   `cat build-packages.txt`
 
 # An ugly hack to downgrade qemu-user-static.
@@ -146,7 +146,7 @@ sudo apt-get install $APT_GET_OPT \
 CODENAME=`lsb_release -cs`
 if test "x$CODENAME" = ximpish
 then
-    sudo apt-get install $APT_GET_OPT qemu-user-static/hirsute || exit 1
+    sudo apt-get $APT_GET_OPT install qemu-user-static/hirsute || exit 1
 fi
 
 } # install_build_packages ()
@@ -404,7 +404,7 @@ then
 echo "Hit enter to continue"
 read x
 fi
-sudo chroot sdcard /bin/bash -c "apt-get -y install \
+sudo chroot sdcard /bin/bash -c "apt-get -y install\
     initramfs-tools u-boot-tools \
     command-not-found bash-completion \
     avahi-daemon avahi-utils libnss-mdns parted \
@@ -833,13 +833,13 @@ echo "  cross-compiling XCSoar for the Cubieboard2"
 read x
 if [ y$x = yy -o y$x = yY -o y$x = y ]
 then
-  sudo chroot sdcard /bin/bash -c "cat /dev-packages.txt |xargs apt-get -y install " || cleanup_and_exit_error
+  sudo chroot sdcard /bin/bash -c "cat /dev-packages.txt |xargs apt-get -y install" || cleanup_and_exit_error
 
   cat sdcard/dev-packages.txt | xargs sudo apt-get -y install || cleanup_and_exit_error
   
   if test $WITH_MALI = 0
   then
-    sudo chroot sdcard /bin/bash -c "cat /mesa-dev-packages.txt |xargs apt-get -y install " || cleanup_and_exit_error
+    sudo chroot sdcard /bin/bash -c "cat /mesa-dev-packages.txt |xargs apt-get -y install" || cleanup_and_exit_error
   fi
 
 # Mesa is incompatible with Mali on the target device.
