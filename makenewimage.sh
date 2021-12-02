@@ -399,6 +399,7 @@ echo "Install bash completion"
 echo "Install U-Boot tools"
 echo "Install zeroconfig components and parted"
 echo "Install net-tools nfs and ssh server"
+echo "Install sudo"
 if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
@@ -411,7 +412,8 @@ sudo chroot sdcard /bin/bash -c "apt-get -y install\
     nfs-common \
     net-tools ifupdown \
     openssh-server \
-    bluetooth" || cleanup_and_exit_error
+    bluetooth \
+    sudo" || cleanup_and_exit_error
 
 } # update_complete_base_system ()
 
