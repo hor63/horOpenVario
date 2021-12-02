@@ -5,7 +5,7 @@ crossbuild-essential-armel
 bison
 flex
 gawk
-python
+python2
 python3
 initramfs-tools
 command-not-found

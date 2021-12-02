@@ -177,7 +177,7 @@ p
 
 p
 w
-q" | fdisk sd.img || exit 1
+q" | sudo fdisk sd.img || exit 1
 
 } # create_partition_sd_image ()
 
