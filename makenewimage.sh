@@ -39,44 +39,16 @@ exit 1
 } # cleanup_and_exit_error ()
 
 # ===================================================
-select_arch_and_distribution () {
+select_distribution () {
 
 # Architecture of the target system
-# Can be something like armhf, amd64, i386, arm64, s390 (haha)
-# Must conform with existing Unbuntu architectures
-if [ y$TARGETARCH = y ]
-then
-    TARGETARCH=armhf
-fi
-
-# According to the architecture I may need the emulator to be able to chroot into the
+TARGETARCH=armhf
+ARCH=arm
+ARCH_PREFIX=arm-linux-gnueabihf
+BUILDDIR=build
+# According to the architecture I need the emulator to be able to chroot into the
 # new root.
-case $TARGETARCH in
-    armhf)
-        EMULATOR=qemu-arm-static
-        ARCH=arm
-        BUILDDIR=build
-        ;;
-     i386)
-        EMULATOR=qemu-i386-static
-        ARCH=x86
-        BUILDDIR=build.i386
-        ;;
-     arm64)
-        EMULATOR=qemu-aarch64-static
-        ARCH=arm64
-        BUILDDIR=build.arm64
-        ;;
-     s390)
-        EMULATOR=qemu-s390x-static
-        ARCH=s390
-        BUILDDIR=build.s390
-        ;;
-     *)
-        echo "Error: \$TARGETARCH is undefined or invalid. \$TARGETARCH = \"$TARGETARCH\""
-        exit 1
-        ;;
-    esac
+EMULATOR=qemu-arm-static
 
 while test -z "$distris"
 do
@@ -124,7 +96,7 @@ do
     fi
     
 done
-} # select_arch_and_distribution ()
+} # select_distribution ()
 
 # ==========================================
 install_build_packages () {
@@ -355,8 +327,7 @@ then
         APT_PROXY_PORT="$x"
     fi
 
-    echo "Acquire::http::Proxy \"http://$APT_PROXY_HOST:$APT_PROXY_PORT\";
-Acquire::https::Proxy \"http://$APT_PROXY_HOST:$APT_PROXY_PORT\";" | sudo tee sdcard/etc/apt/apt.conf.d/00aptproxy
+    echo "Acquire::http::Proxy \"http://$APT_PROXY_HOST:$APT_PROXY_PORT\";" | sudo tee sdcard/etc/apt/apt.conf.d/00aptproxy
 fi
 
 sudo chroot sdcard /bin/bash -c "apt-get -y update"
@@ -415,6 +386,12 @@ sudo chroot sdcard /bin/bash -c "apt-get -y install\
     bluetooth \
     sudo" || cleanup_and_exit_error
 
+    if test "$DEBIAN" = 1
+    then
+      apt-file update
+      update-command-not-found
+    fi
+    
 } # update_complete_base_system ()
 
 # ==========================================
@@ -617,7 +594,7 @@ then
         fi
 
     # undo the patches. Otherwise the next build will fail because applying the patches is part of the build option of build.sh
-    CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -c
+    CROSS_COMPILE=${ARCH_PREFIX}- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -c
     exit 0
 
     ) || cleanup_and_exit_error
@@ -904,9 +881,9 @@ Description: MALI R${MALI_VERSION}P${MALI_PATCH} userspace blob for fbdev device
 mkdir build/mali-deb/usr || cleanup_and_exit_error
 mkdir build/mali-deb/usr/include || cleanup_and_exit_error
 mkdir build/mali-deb/usr/lib || cleanup_and_exit_error
-mkdir build/mali-deb/usr/lib/arm-linux-gnueabihf || cleanup_and_exit_error
+mkdir build/mali-deb/usr/lib/${ARCH_PREFIX} || cleanup_and_exit_error
 cp -Rpv src/mali-blobs/include/fbdev/* build/mali-deb/usr/include/ || cleanup_and_exit_error
-cp -Rpv src/mali-blobs/r${MALI_VERSION}p${MALI_PATCH}/arm/fbdev/lib* build/mali-deb/usr/lib/arm-linux-gnueabihf/ || cleanup_and_exit_error
+cp -Rpv src/mali-blobs/r${MALI_VERSION}p${MALI_PATCH}/arm/fbdev/lib* build/mali-deb/usr/lib/${ARCH_PREFIX}/ || cleanup_and_exit_error
 find build/mali-deb/usr/ -type d |xargs chmod -v 755 
 find build/mali-deb/usr/include -type f |xargs chmod -v 644
 find build/mali-deb/usr/lib -type f |xargs chmod -v 755
@@ -930,6 +907,59 @@ then
 fi # if [ "y$INSTALL_MALI_BLOB" = yy ]  
 
 } # build_mali_blob_deb ()
+
+# ==========================================
+# Ubuntu and Debian sym-link a lot of shared libraries with an absolute path
+# to /lib/... instead of a relative symbolic link in the same directory.
+# This prevents gcc with the option --with-sysroot to find the library in the cross-build root file system.
+
+# Therefore fix these symbolic links by creating symbolic links to the SD card image, 
+# i.e. to the real root file system.
+fix_lib_symlinks () {
+
+SYS_LIB_DIR=`pwd`/sdcard/lib/$ARCH_PREFIX
+
+# Check if the architecture system library directory exists at all.
+if test ! -d $SYS_LIB_DIR
+then
+  echo "--- Warning! Cannot find system library directory $SYS_LIB_DIR"
+  echo "    Skipping fixing library symbolic links"
+  return 0
+fi
+
+echo " "
+echo "Fixing system library symbolic links"
+
+pushd $SYS_LIB_DIR
+pwd
+
+for i in *
+do
+  if test -L $i
+  then
+    l=`readlink -f $i`
+    if test -n "$l"
+    then
+      f=`basename $l`
+      d=`dirname $l`
+      af=$SYS_LIB_DIR/$f
+      if test \( ! -f $l \) -a \( -f $af \)
+      then
+        if test ! -d $d
+        then
+            echo "Create local system library directory $d"
+            sudo mkdir -p $d
+        fi
+
+        echo "Fixing sdcard/lib/$ARCH_PREFIX/$i"
+        sudo ln -s $af $l
+      fi  
+    fi
+  fi
+done
+
+popd
+} # fix_lib_symlinks ()
 
 # ==========================================
 finish_installation () {
@@ -1004,7 +1034,7 @@ cd $BASEDIR
 echo "Selected distribution is $distris"
 echo " "
 
-select_arch_and_distribution
+select_distribution
 install_build_packages
 create_partition_sd_image
 format_mount_sd_image
@@ -1038,6 +1068,7 @@ else
     blacklist_module mali
     load_module lima
 fi
+fix_lib_symlinks
 finish_installation
 
 echo "Copy the SD card image \"sd.img\" to the SD card raw device"  
