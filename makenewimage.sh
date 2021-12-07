@@ -356,9 +356,6 @@ echo "# /etc/fstab: static file system information.
 echo " "
 echo "Please enter the host name of the target computer"
 read x
-sudo chroot sdcard /bin/bash -c "hostname $x"
-echo "hostname is now:"
-sudo chroot sdcard /bin/bash -c "hostname"
 # Make the hostname permanent in the hostname file.
 # By default it is set to the name of the build machine.
 echo $x |sudo tee sdcard/etc/hostname >/dev/null
