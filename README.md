@@ -79,7 +79,7 @@ Questions which will be asked or options to be chosen are:
   Example is the symbolic link `/lib/arm-linux-gnueabihf/libz.so` -> `/lib/arm-linux-gnueabihf/libz.so.1.2.11`. When you are cross-compiling with a root file system of the
   target system like `/home/foo/horOpenVario/sdcard` the symbolic link of `lib/libz.so` *should* point to
   `/home/foo/horOpenVario/sdcard/lib/arm-linux-gnueabihf/libz.so.1.2.11` but with the absolute path it points to `/lib/arm-linux-gnueabihf/libz.so.1.2.11`. But there is noting.  
-  Therefore symbolic links are created from `/lib/arm-linux-gnueabihf` to your SD card image. This has not adverse side effect which I am aware of. But be warned that the script does stuff to you `/lib/arm-linux-gnueabihf` directory.
+  Therefore symbolic links are created from `/lib/arm-linux-gnueabihf` to your SD card image. This has not adverse side effect which I am aware of. But be warned that the script does stuff to your `/lib/arm-linux-gnueabihf` directory.
 - Interactively select the timezone in which the Cubie is located.
 - Interactively select the locale(s) you want to install. Select *at least* `en_US.UTF-8`. Otherwise you may get funny error messages, particularly from Python based stuff.
 - Select the keyboard type, and layout (English, German...).
