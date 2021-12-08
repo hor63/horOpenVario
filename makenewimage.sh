@@ -794,7 +794,7 @@ echo " build-essential
 
     if test $distris = "hirsute" -o $distris = "impish" -o $distris = "stable" -o $distris = "testing"
     then
-    echo "liblua5.4-dev lua5.4" | sudo tee -a sdcard/dev-packages.txt > /dev/null
+      echo "liblua5.4-dev lua5.4" | sudo tee -a sdcard/dev-packages.txt > /dev/null
     fi
 
     
@@ -818,10 +818,12 @@ then
     sudo chroot sdcard /bin/bash -c "cat /mesa-dev-packages.txt |xargs apt-get -y install" || cleanup_and_exit_error
   fi
 
-# Mesa is incompatible with Mali on the target device.
 # Cross tools are useless on the target machine.
   cat sdcard/mesa-dev-packages.txt | \
     xargs sudo apt-get -y install crossbuild-essential-armhf || cleanup_and_exit_error
+
+    # To enable cross compilation fix the symbolic links to the system libraries in /lib/arm-linux-gnueabihf
+    fix_lib_symlinks
     
 fi # Do you want to install the XCSoar build components?
 
@@ -1065,7 +1067,6 @@ else
     blacklist_module mali
     load_module lima
 fi
-fix_lib_symlinks
 finish_installation
 
 echo "Copy the SD card image \"sd.img\" to the SD card raw device"  
