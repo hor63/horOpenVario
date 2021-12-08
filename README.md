@@ -2,7 +2,7 @@
 
 *Copyright (C) 2017-2021  Kai Horstmann*
 
-# Open Vario on Cubieboard 2 running Ubuntu
+# Open Vario on Cubieboard 2 running Ubuntu or Debian
 ## horOpenVario
 
 This repository is the main repository of [horOpenVario](https://github.com/hor63/horOpenVario.git).
@@ -15,14 +15,14 @@ It includes
 - The SD card image itself contains the /boot and root partition. 
 - U-Boot binary image installed at the start of the image before the boot partition.
 - A vanilla 5.10 LTS Linux kernel, currently the recent patch 58 compiled from sources
-- Vanilla Ubuntu LTS 21.10 (Impish) installation with debootstrap, featuring:
+- Vanilla Ubuntu LTS 21.10 (Impish) / Debian Stable / Debian Testing installation with debootstrap, featuring:
   - Text mode only
   - Networking for USB tethering e.g. with Android, Ethernet, and multiple WiFi USB sticks (particularly Realtec).
-  - Bluetooth components and driver for BT USB dongle are installed but connecting to a Bluetooth hotspot is at this time completely manual.
+  - Bluetooth components and driver for BT USB dongle are installed. However connecting to a Bluetooth hotspot is at this time completely manual.
   - Complete development package to compile XCSoar directly on the Cubieboard
   - **Working** OpenGL ES 2.0 Mali acceleration either with
     -  Closed-source MALI blob, and out-of-tree Mali driver
-    -  Open-source LIMA driver in the kernel, and Mesa client side (Ubuntu Focal and Hirsute already bring a version of Mesa with working Lima driver)
+    -  Open-source LIMA driver in the kernel, and Mesa client side (Ubuntu Focal and Hirsute as well as Debian already bring a version of Mesa with working Lima driver)
 
 
 ## Checkout the repository
@@ -42,11 +42,12 @@ or initialize and load the sub-modules separately.
 
 ## Prerequisites and systems
 
-My host system for buildng is Ubuntu 21.04 (Hirsute). This has the advantage that it is the identical version as the target system in the SD card image.
-This makes cross-compilation rather painless because compiler and runtime libs in the target system are fitting seamlessly.
+My host system for buildng is Ubuntu 21.04 (Hirsute).
+I also tested Debian Stable (Bullseye) and Testing (Bookworm) from a `debootstrap` installation with `chroot` under the Ubuntu kernel.  
+I *highly* recomment to use the same distribution and version for host and target system.
+This makes cross-compilation rather painless because compiler and runtime libs in the target system are fitting seamlessly when you cross-compile on the host.
 
-To work with Debian and other Debian-based systems as host and/or target system should be rather simple. They also use DEB packages and APT for installation.
-The package names should be identical or at least similar.   
+This BSP is tested and works for Ubuntu and Debian OOTB.  
 For Fedora, OpenSuse and the likes your mileage may vary.   
 And don't even start with OpenEmbedded & Co. I have no idea how that may work :upside_down_face:
 
@@ -67,12 +68,11 @@ Questions which will be asked or options to be chosen are:
 - Select the Ubuntu version to be installed (Hirsute (21.04) version is default. Required for the most recent XCSoar due to GCC and Lua version requirements).
 - If you re-use a previously downloaded base installation tarball when you run `./makenewimage.sh` multiple times, or download it again (default is re-use).
 - `root` password of the new system. The system will have by default a working root user. Use it at your own risk.
-- Use of an APT proxy. It requires a working `apt-proxy-ng` installation in your network. Default is not using a cache.  
+- Use of an APT proxy. It requires a working `apt-proxy` installation in your network (`apt-proxy-ng` is proven to be *not* reliable). Default is not using a cache.  
   *Please note*: The proxy setting is being written to the APT configuration on the target image into ´/etc/apt/apt.conf.d/00aptproxy´. You may want to delete it once you have the Cubieboard up and running. In case you provide a real hostname, and valid port, and your Cubie can reach that machine you can continue using the cache.
 - Host name of the target machine. Chose a unique name within your network. No default. You have to enter a real name.
 - (text based) network management:
   - **Network manager**. Use `nmtui` to configure WiFi networks. Default.
-  - **wicd-curses** *Obsolete*! This package only existed in `bionic`
   - No network management at all. You need to install additional packages yourself, and perform the configuration manually.
 - If you want to install development tools for native building XCSoar (and other stuff) on the Cubieboard. Default Yes.
 - Interactively select the timezone in which the Cubie is located.
