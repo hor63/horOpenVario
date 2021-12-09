@@ -20,7 +20,6 @@
 
 # set -x
 
-export LANG=C.UTF-8
 
 # ==========================================
 cleanup_and_exit_error () {
@@ -225,7 +224,7 @@ sudo debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACH
 } # install_base_system ()
 
 # ==========================================
-update_complete_base_system () {
+update_base_system () {
 
 # Mount the dynamic kernel managed file systems for a pleasant CHROOT experience
 sudo mount -t sysfs sysfs sdcard/sys
@@ -315,9 +314,14 @@ then
     echo "Acquire::http::Proxy \"http://$APT_PROXY_HOST:$APT_PROXY_PORT\";" | sudo tee sdcard/etc/apt/apt.conf.d/00aptproxy
 fi
 
-sudo chroot sdcard /bin/bash -c "apt-get -y update"
 
-sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
+LANG=C.UTF-8 LC_ALL=C sudo chroot sdcard /bin/bash -c "apt-get -y update"
+
+LANG=C.UTF-8 LC_ALL=C sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
+
+} # update_base_system ()
+
+install_complete_base_system () {
 
 if test $NO_PAUSE = 0
 then
@@ -429,7 +433,7 @@ echo " "
 echo "Rebuild uboot"
 
 ( 
-  $BUILDDIR/u-boot/build.sh -j8 || exit 1
+  $BUILDDIR/u-boot/build.sh -j4 || exit 1
 ) || cleanup_and_exit_error  
 
 } # rebuild_u_boot ()
@@ -463,7 +467,7 @@ build_kernel_deb () {
 
   echo " "
   echo "Build Debian kernel package"
-  KDEB_COMPRESS=gzip $BUILDDIR/kernel/build.sh -j8 bindeb-pkg || exit 1
+  KDEB_COMPRESS=gzip $BUILDDIR/kernel/build.sh -j4 bindeb-pkg || exit 1
   
 ) || cleanup_and_exit_error  
 
@@ -813,11 +817,11 @@ then
 echo "Hit enter to continue"
 read x
 fi
-sudo chroot sdcard /bin/bash -c "apt-get -y update"
-sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
-sudo chroot sdcard /bin/bash -c "apt-get -y install locales keyboard-configuration console-setup"
-sudo chroot sdcard /bin/bash -c "dpkg-reconfigure tzdata"
-sudo chroot sdcard /bin/bash -c "dpkg-reconfigure locales"
+LANG=C.UTF-8 LC_ALL=C sudo chroot sdcard /bin/bash -c "apt-get -y update"
+LANG=C.UTF-8 LC_ALL=C sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
+LANG=C.UTF-8 LC_ALL=C sudo chroot sdcard /bin/bash -c "apt-get -y install locales keyboard-configuration console-setup"
+LANG=C.UTF-8 LC_ALL=C sudo chroot sdcard /bin/bash -c "dpkg-reconfigure tzdata"
+LANG=C.UTF-8 LC_ALL=C sudo chroot sdcard /bin/bash -c "dpkg-reconfigure locales"
 sudo chroot sdcard /bin/bash -c "dpkg-reconfigure keyboard-configuration"
 sudo chroot sdcard /bin/bash -c "apt-get -y update"
 sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
@@ -1013,7 +1017,9 @@ create_partition_sd_image
 format_mount_sd_image
 download_base_system_tarball
 install_base_system
-update_complete_base_system
+update_base_system
+config_locale_keyboard
+install_complete_base_system
 install_network_management
 rebuild_u_boot
 build_kernel_deb
@@ -1025,7 +1031,6 @@ install_linux_firmware
 copy_installation_support
 install_u_boot
 install_dev_packages
-config_locale_keyboard
 load_module sun4i-codec
 build_mali_blob_deb 6 2
 if $WITH_MALI = 1
