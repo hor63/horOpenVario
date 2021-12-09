@@ -46,9 +46,6 @@ TARGETARCH=armhf
 ARCH=arm
 ARCH_PREFIX=arm-linux-gnueabihf
 BUILDDIR=build
-# According to the architecture I need the emulator to be able to chroot into the
-# new root.
-EMULATOR=qemu-arm-static
 
 while test -z "$distris"
 do
@@ -82,6 +79,9 @@ do
         ydt)
             distris="testing"
             ;;
+        y)
+            distris="hirsute"
+            ;;
         *)
             echo "Invalid input \"$x\"."
             echo "Allowed are 'x', 'a', 'b'"
@@ -112,14 +112,6 @@ fi
 sudo apt-get $APT_GET_OPT update
 sudo apt-get $APT_GET_OPT  install \
   `cat build-packages.txt`
-
-# An ugly hack to downgrade qemu-user-static.
-# qemu-user-static has an fatal regression in Impish.
-CODENAME=`lsb_release -cs`
-if test "x$CODENAME" = ximpish
-then
-    sudo apt-get $APT_GET_OPT install qemu-user-static/hirsute || exit 1
-fi
 
 } # install_build_packages ()
 
@@ -219,13 +211,6 @@ fi
 
 # ==========================================
 install_base_system () {
-
-# Copy the static emulator image to the SD card to be able to run programs in the target architecture
-if [ -f /usr/bin/$EMULATOR ]
-then
-    sudo mkdir -p sdcard/usr/bin || cleanup_and_exit_error
-    sudo cp -v /usr/bin/$EMULATOR sdcard/usr/bin || cleanup_and_exit_error
-fi
 
 echo " "
 echo "Create the root file system for $distris distribution with:"
