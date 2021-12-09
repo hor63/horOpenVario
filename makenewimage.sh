@@ -381,24 +381,13 @@ install_network_management () {
 
 echo " "
 echo "Do you want to configure network adapters, WiFi... manually"
-echo "  or menu based with nmtui (network manager text UI) or wicd?"
-echo "Please enter n(mtui) , m(anual) or w(icd). Default 'n'"
+echo "  or menu based with nmtui (network manager text UI)?"
+echo "Please enter 'n'(mtui)  or 'm'(anual). Default 'n'"
 read x
 
 if [ y$x = "y" ]
 then
     x=n
-fi
-
-if [ y$x = "yw" ]
-then
-    sudo chroot sdcard /bin/bash -c "apt-get -y install wicd-cli wicd-curses wicd-daemon" || cleanup_and_exit_error
-
-    if test $NO_PAUSE = 0
-    then
-        echo "Hit enter to continue"
-        read x
-    fi
 fi
 
 if [ y$x = "yn" ]
