@@ -1,0 +1,128 @@
+/dts-v1/;
+#include "sun7i-a20-cubieboard2.dts"
+
+/ {
+	panel: panel {
+		compatible = "panel-lvds";
+		pinctrl-names = "default";
+		pinctrl-0 = <&lcd_lvds0_pins>;
+		enable-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
+		backlight = <&backlight>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port {
+			lvds_panel_in: endpoint {
+				remote-endpoint = <&display_out_rgb>;
+			};
+		};
+	};
+
+	backlight: lcd {
+		compatible = "pwm-backlight";
+		pinctrl-names = "default";
+		pwms = <&pwm 0 5000000 0>;
+		brightness-levels = <0 8 16 32 64 128 255 384 512 768 1024>;
+		default-brightness-level = <10>;
+	};
+
+};
+
+
+&i2c1 {
+	status = "okay";
+
+	touchscreen: cubiets@5c {
+		compatible = "cubiets";
+		pinctrl-names = "default";
+		pinctrl-0 = <&cubiets_int_pin>;
+		reg = <0x5c>;
+		interrupt-parent = <&pio>;
+		interrupts = <7 7 IRQ_TYPE_EDGE_RISING>; /* PH7 / EINT7 */
+		interrupt-names = "Touchscreen";
+	};
+};
+
+
+&pio {
+	led_pins_cubieboard2: led_pins@0 {
+		pins = "PH20", "PH21";
+		function = "gpio_out";
+	};
+
+	usb0_id_detect_pin: usb0_id_detect_pin@0 {
+		pins = "PH4";
+		function = "gpio_in";
+		bias-pull-up;
+	};
+
+	cubiets_int_pin:cubiets_int_pin@0 {
+		pins = "PH7";
+		function = "irq";
+		bias-pull-up;
+	};
+
+	mmc2_cd_pin: mmc2_cd_pin@0 {
+		pins = "PH0";
+		function = "gpio_in";
+		bias-pull-up;
+	};
+};
+
+&pwm {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pwm0_pin>;
+	status = "okay";
+};
+
+&reg_ahci_5v {
+	status = "okay";
+};
+
+
+// UART2 on Schematic
+&uart5 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart5_ph_pins>;
+	status = "okay";
+};
+
+// UART? on Schematic
+&uart3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart3_pg_pins>;
+	status = "okay";
+};
+
+// UART? on Schematic
+&uart4 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart4_pg_pins>;
+	status = "okay";
+};
+
+// UART6 on Schematic - enabling this removes SPI functionality in order to enable 4th IGC port usage
+&uart6 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart6_pi_pins>;
+	status = "okay";
+};
+
+&rtp {
+	allwinner,ts-attached;
+	allwinner,tp-sensitive-adjust = <0>;
+	allwinner,filter-type = <3>;
+};
+
+
+&tcon0 {
+	ports {
+		tcon0_out: port@1 {
+			display_out_rgb: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&lvds_panel_in>;
+				allwinner,tcon-channel = <0>;
+			};
+		};
+	};
+};

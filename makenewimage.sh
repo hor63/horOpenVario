@@ -432,7 +432,7 @@ fi
 echo " "
 echo "Rebuild uboot"
 
-( 
+(
   $BUILDDIR/u-boot/build.sh -j4 || exit 1
 ) || cleanup_and_exit_error  
 
@@ -462,7 +462,8 @@ build_kernel_deb () {
   then
     echo " "
     echo "Build the device tree image"
-    KDEB_COMPRESS=gzip $BUILDDIR/kernel/build.sh dtbs || exit 1
+    cp -v devicetree/*.dts src/kernel/arch/arm/boot/dts/ 
+    KDEB_COMPRESS=gzip $BUILDDIR/kernel/build.sh dtbs openvario.dtb || exit 1
   fi # if [ $TARGETARCH = armhf ]
 
   echo " "
@@ -592,7 +593,7 @@ fi
 ( cd sdcard/boot ; 
 echo "# setenv bootm_boot_mode sec
 setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1
-ext2load mmc 0 0x43000000 sun7i-a20-cubieboard2.dtb
+ext2load mmc 0 0x43000000 openvario.dtb
 # Building the initrd is broken. The kernel boots without initrd just fine.
 # ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
 ext2load mmc 0 0x41000000 vmlinuz-$LINUX_VERSION
@@ -615,10 +616,10 @@ echo "Add boot script and device tree to the debian installer image"
 if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
 then
     sudo cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $BUILDDIR/kernel/debian/tmp/boot
-    sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb $BUILDDIR/kernel/debian/tmp/boot
+    sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/openvario.dtb $BUILDDIR/kernel/debian/tmp/boot
 else
     sudo cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $BUILDDIR/kernel/debian/linux-image/boot
-    sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb $BUILDDIR/kernel/debian/linux-image/boot
+    sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/openvario.dtb $BUILDDIR/kernel/debian/linux-image/boot
 fi
 
 } # make_u_boot_script ()
@@ -664,7 +665,7 @@ fi
 rm -fv $BUILDDIR/linux-image-$LINUX_VERSION-dbg*.deb
 
 # Clean the boot scripts and device tree. They are now supposed to come with the Debian installer
-sudo rm -vf sdcard/boot/boot.cmd sdcard/boot/boot.scr sdcard/boot/sun7i-a20-cubieboard2.dtb
+sudo rm -vf sdcard/boot/boot.cmd sdcard/boot/boot.scr sdcard/boot/openvario.dtb
 
 sudo cp -v $BUILDDIR/linux-*$LINUX_VERSION*.deb sdcard
 
