@@ -32,7 +32,7 @@ sudo umount sdcard/dev/pts
 sudo umount sdcard/dev
 sudo umount sdcard/boot
 sudo umount sdcard
-sudo losetup -d /dev/loop5
+sudo losetup -d ${LOOPDEV}
 
 exit 1
 } # cleanup_and_exit_error ()
@@ -155,16 +155,24 @@ echo "Hit enter to continue"
 read x
 fi
 
-sudo losetup /dev/loop5 sd.img || exit 1
-sudo partprobe /dev/loop5 || cleanup_and_exit_error
-sudo mkfs.ext2 -F /dev/loop5p1 || cleanup_and_exit_error
-sudo mkfs.ext2 -F /dev/loop5p2 || cleanup_and_exit_error
+LOOPDEV=`sudo losetup -f`
+if test -z "$LOOPDEV"
+then 
+    echo "No loop device available. Stop."
+    exit 1
+else
+    echo "Using loop device ${LOOPDEV}"
+fi
+sudo losetup ${LOOPDEV} sd.img || exit 1
+sudo partprobe ${LOOPDEV} || cleanup_and_exit_error
+sudo mkfs.ext2 -F ${LOOPDEV}p1 || cleanup_and_exit_error
+sudo mkfs.ext2 -F ${LOOPDEV}p2 || cleanup_and_exit_error
 
 mkdir -p sdcard
 
-sudo mount /dev/loop5p2 sdcard || cleanup_and_exit_error
+sudo mount ${LOOPDEV}p2 sdcard || cleanup_and_exit_error
 sudo mkdir -p sdcard/boot || cleanup_and_exit_error
-sudo mount /dev/loop5p1 sdcard/boot || cleanup_and_exit_error
+sudo mount ${LOOPDEV}p1 sdcard/boot || cleanup_and_exit_error
 
 } # format_mount_sd_image ()
 
@@ -733,7 +741,7 @@ then
 echo "Hit enter to continue"
 read x
 fi
-sudo dd if=$BUILDDIR/u-boot/u-boot-sunxi-with-spl.bin of=/dev/loop5 bs=1024 seek=8 || cleanup_and_exit_error
+sudo dd if=$BUILDDIR/u-boot/u-boot-sunxi-with-spl.bin of=${LOOPDEV} bs=1024 seek=8 || cleanup_and_exit_error
 
 fi # if [ $TARGETARCH = armhf ]
 
@@ -978,7 +986,7 @@ sudo umount sdcard/dev/pts
 sudo umount sdcard/dev
 sudo umount sdcard/boot
 sudo umount sdcard
-sudo losetup -d /dev/loop5
+sudo losetup -d ${LOOPDEV}
 
 } # finish_installation ()
 

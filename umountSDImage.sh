@@ -19,10 +19,16 @@
 
 echo "Unmount the SD card image"  
 sync
+
 sudo umount sdcard/sys
 sudo umount sdcard/proc
 sudo umount sdcard/dev/pts
 sudo umount sdcard/dev
 sudo umount sdcard/boot
 sudo umount sdcard
-sudo losetup -d /dev/loop5
+losetup --list |fgrep /sd.img |while read i k
+do
+  echo "Detach loopback device $i"
+  sudo losetup -d $i
+done
+
