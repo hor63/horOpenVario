@@ -29,12 +29,12 @@ sudo losetup ${LOOPDEV} sd.img || exit 1
 sudo partprobe ${LOOPDEV}
 
 sync
-sudo mount ${LOOPDEV}p2 sdcard 
-sudo mount ${LOOPDEV}p1 sdcard/boot
+sudo mount -v -o defaults,noatime ${LOOPDEV}p2 sdcard 
+sudo mount -v -o defaults,noatime ${LOOPDEV}p1 sdcard/boot
 sync
 
 # Mount the dynamic kernel managed file systems for a pleasant CHROOT experience
-sudo mount -t sysfs sysfs sdcard/sys
-sudo mount -t proc proc sdcard/proc
-sudo mount -t devtmpfs udev sdcard/dev
-sudo mount -t devpts devpts sdcard/dev/pts
+sudo mount -v -t sysfs sysfs sdcard/sys
+sudo mount -v -t proc proc sdcard/proc
+sudo mount -v -t devtmpfs udev sdcard/dev
+sudo mount -v -t devpts devpts sdcard/dev/pts

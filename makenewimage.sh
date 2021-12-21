@@ -170,9 +170,9 @@ sudo mkfs.ext2 -F ${LOOPDEV}p2 || cleanup_and_exit_error
 
 mkdir -p sdcard
 
-sudo mount ${LOOPDEV}p2 sdcard || cleanup_and_exit_error
+sudo mount -v -o defaults,noatime ${LOOPDEV}p2 sdcard || cleanup_and_exit_error
 sudo mkdir -p sdcard/boot || cleanup_and_exit_error
-sudo mount ${LOOPDEV}p1 sdcard/boot || cleanup_and_exit_error
+sudo mount -v -o defaults,noatime ${LOOPDEV}p1 sdcard/boot || cleanup_and_exit_error
 
 } # format_mount_sd_image ()
 
@@ -235,10 +235,10 @@ sudo debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACH
 update_base_system () {
 
 # Mount the dynamic kernel managed file systems for a pleasant CHROOT experience
-sudo mount -t sysfs sysfs sdcard/sys
-sudo mount -t proc proc sdcard/proc
-sudo mount -t devtmpfs udev sdcard/dev
-sudo mount -t devpts devpts sdcard/dev/pts
+sudo mount -v -t sysfs sysfs sdcard/sys
+sudo mount -v -t proc proc sdcard/proc
+sudo mount -v -t devtmpfs udev sdcard/dev
+sudo mount -v -t devpts devpts sdcard/dev/pts
 
 echo " "
 echo "Please enter the new root password of the target image"
@@ -346,8 +346,8 @@ echo "# /etc/fstab: static file system information.
 # that works even if disks are added and removed. See fstab(5).
 #
 # <file system> <mount point>   <type>  <options>       <dump>  <pass>
-/dev/mmcblk0p2       /               ext2    nodiratime,errors=remount-ro 0       1
-/dev/mmcblk0p1       /boot           ext2    nodiratime 0       1
+/dev/mmcblk0p2       /               ext2    defaults,noatime,errors=remount-ro 0       1
+/dev/mmcblk0p1       /boot           ext2    defaults,noatime 0       1
 " | sudo tee sdcard/etc/fstab 
 
 echo " "
@@ -599,7 +599,7 @@ fi
 
 ( cd sdcard/boot ; 
 echo "# setenv bootm_boot_mode sec
-setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1
+setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootflags=defaults,noatime rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1
 ext2load mmc 0 0x43000000 sun7i-a20-cubieboard2.dtb
 # Building the initrd is broken. The kernel boots without initrd just fine.
 # ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
