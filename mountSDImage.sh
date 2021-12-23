@@ -17,16 +17,24 @@
 #    with this program; if not, write to the Free Software Foundation, Inc.,
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-sudo losetup /dev/loop5 sd.img || exit 1
-sudo partprobe /dev/loop5
+LOOPDEV=`sudo losetup -f`
+if test -z "$LOOPDEV"
+then 
+    echo "No loop device available. Stop."
+    exit 1
+else
+    echo "Using loop device ${LOOPDEV}"
+fi
+sudo losetup ${LOOPDEV} sd.img || exit 1
+sudo partprobe ${LOOPDEV}
 
 sync
-sudo mount /dev/loop5p2 sdcard 
-sudo mount /dev/loop5p1 sdcard/boot
+sudo mount -v -o defaults,noatime ${LOOPDEV}p2 sdcard 
+sudo mount -v -o defaults,noatime ${LOOPDEV}p1 sdcard/boot
 sync
 
 # Mount the dynamic kernel managed file systems for a pleasant CHROOT experience
-sudo mount -t sysfs sysfs sdcard/sys
-sudo mount -t proc proc sdcard/proc
-sudo mount -t devtmpfs udev sdcard/dev
-sudo mount -t devpts devpts sdcard/dev/pts
+sudo mount -v -t sysfs sysfs sdcard/sys
+sudo mount -v -t proc proc sdcard/proc
+sudo mount -v -t devtmpfs udev sdcard/dev
+sudo mount -v -t devpts devpts sdcard/dev/pts
