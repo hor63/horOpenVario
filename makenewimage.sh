@@ -898,8 +898,7 @@ fi # if [ "y$INSTALL_MALI_BLOB" = yy ]
 # to /lib/... instead of a relative symbolic link in the same directory.
 # This prevents gcc with the option --with-sysroot to find the library in the cross-build root file system.
 
-# Therefore fix these symbolic links by creating symbolic links to the SD card image, 
-# i.e. to the real root file system.
+# Therefore fix these symbolic links by replacing them with relative szmbolic links.
 fix_lib_symlinks () {
 
 SYS_LIB_DIR=`pwd`/sdcard/lib/$ARCH_PREFIX
@@ -913,7 +912,7 @@ then
 fi
 
 echo " "
-echo "Fixing system library symbolic links"
+echo "Fixing system library symbolic links in $SYS_LIB_DIR"
 
 pushd $SYS_LIB_DIR
 pwd
@@ -927,17 +926,11 @@ do
     then
       f=`basename $l`
       d=`dirname $l`
-      af=$SYS_LIB_DIR/$f
-      if test \( ! -f $l \) -a \( -f $af \)
+      if test \( ! -f $l \) -a \( -f $f \)
       then
-        if test ! -d $d
-        then
-            echo "Create local system library directory $d"
-            sudo mkdir -p $d
-        fi
-
-        echo "Fixing sdcard/lib/$ARCH_PREFIX/$i"
-        sudo ln -s $af $l
+        echo "Link sdcard/lib/$ARCH_PREFIX/$i to $f"
+        sudo rm -v $i
+        sudo ln -s $f $i
       fi  
     fi
   fi
