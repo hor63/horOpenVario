@@ -26,7 +26,7 @@ sudo umount sdcard/dev/pts
 sudo umount sdcard/dev
 sudo umount sdcard/boot
 sudo umount sdcard
-losetup --list |fgrep /sd.img |while read i k
+sudo losetup --list |fgrep /sd.img |while read i k
 do
   echo "Detach loopback device $i"
   sudo losetup -d $i
