@@ -599,7 +599,7 @@ fi
 
 ( cd sdcard/boot ; 
 echo "# setenv bootm_boot_mode sec
-setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootflags=defaults,noatime rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1
+setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1
 ext2load mmc 0 0x43000000 sun7i-a20-cubieboard2.dtb
 # Building the initrd is broken. The kernel boots without initrd just fine.
 # ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
@@ -929,7 +929,7 @@ do
       if test \( ! -f $l \) -a \( -f $f \)
       then
         echo "Link sdcard/lib/$ARCH_PREFIX/$i to $f"
-        sudo rm -v $i
+        sudo rm -fv $i
         sudo ln -s $f $i
       fi  
     fi
