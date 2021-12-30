@@ -29,3 +29,6 @@
 [submodule "mali"]
 	path = setup-ubuntu/mali/mali
 	url = https://github.com/hor63/sunxi-mali-1.git
+[submodule "src/meta-openvario"]
+	path = src/meta-openvario
+	url = https://github.com/Openvario/meta-openvario.git
