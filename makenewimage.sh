@@ -46,6 +46,10 @@ ARCH=arm
 ARCH_PREFIX=arm-linux-gnueabihf
 BUILDDIR=build
 
+#TODO: change to manual selection
+DEVICETREE_FILES="openvario-7-CH070.dtb openvario-57-lvds.dtb"
+devicetree_file="openvario-7-CH070.dtb"
+
 while test -z "$distris"
 do
 
@@ -470,7 +474,8 @@ build_kernel_deb () {
   then
     echo " "
     echo "Build the device tree image"
-    KDEB_COMPRESS=gzip $BUILDDIR/kernel/build.sh dtbs || exit 1
+    cp -v devicetree/*.dts src/kernel/arch/arm/boot/dts/
+    KDEB_COMPRESS=gzip $BUILDDIR/kernel/build.sh dtbs $DEVICETREE_FILES || exit 1
   fi # if [ $TARGETARCH = armhf ]
 
   echo " "
@@ -600,7 +605,7 @@ fi
 ( cd sdcard/boot ; 
 echo "# setenv bootm_boot_mode sec
 setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1
-ext2load mmc 0 0x43000000 sun7i-a20-cubieboard2.dtb
+ext2load mmc 0 0x43000000 $devicetree_file
 # Building the initrd is broken. The kernel boots without initrd just fine.
 # ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
 ext2load mmc 0 0x41000000 vmlinuz-$LINUX_VERSION
@@ -623,10 +628,10 @@ echo "Add boot script and device tree to the debian installer image"
 if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
 then
     sudo cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $BUILDDIR/kernel/debian/tmp/boot
-    sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb $BUILDDIR/kernel/debian/tmp/boot
+    sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/*.dtb $BUILDDIR/kernel/debian/tmp/boot
 else
     sudo cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $BUILDDIR/kernel/debian/linux-image/boot
-    sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb $BUILDDIR/kernel/debian/linux-image/boot
+    sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/*.dtb $BUILDDIR/kernel/debian/linux-image/boot
 fi
 
 } # make_u_boot_script ()
