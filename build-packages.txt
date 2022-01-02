@@ -18,6 +18,7 @@ command-not-found
 u-boot-tools
 dpkg
 parted
+fdisk
 debootstrap
 qemu-user-static
 bc

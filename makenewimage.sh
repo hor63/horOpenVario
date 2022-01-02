@@ -362,7 +362,7 @@ echo "Install initramfs tools"
 echo "Install bash suggestions of packages to install for missing commands"
 echo "Install bash completion"
 echo "Install U-Boot tools"
-echo "Install zeroconfig components and parted"
+echo "Install zeroconfig components parted and fdisk"
 echo "Install net-tools nfs and ssh server"
 echo "Install sudo"
 if test $NO_PAUSE = 0
@@ -373,7 +373,7 @@ fi
 sudo chroot sdcard /bin/bash -c "apt-get -y install\
     initramfs-tools u-boot-tools \
     command-not-found bash-completion \
-    avahi-daemon avahi-utils libnss-mdns parted \
+    avahi-daemon avahi-utils libnss-mdns parted fdisk \
     nfs-common \
     net-tools ifupdown \
     openssh-server \
