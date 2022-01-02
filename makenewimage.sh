@@ -46,10 +46,6 @@ ARCH=arm
 ARCH_PREFIX=arm-linux-gnueabihf
 BUILDDIR=build
 
-#TODO: change to manual selection
-DEVICETREE_FILES="openvario-7-CH070.dtb openvario-57-lvds.dtb"
-devicetree_file="openvario-7-CH070.dtb"
-
 while test -z "$distris"
 do
 
@@ -453,6 +449,17 @@ echo "Rebuild uboot"
 
 # ==========================================
 build_kernel_deb () {
+
+pushd src/meta-openvario/recipes-kernel/linux/linux-mainline  || exit 1
+DEVICETREE_CUSTOM_SOURCES=`echo *.dts`
+popd
+DEVICETREE_CUSTOM_FILES="sun7i-a20-cubieboard2.dtb \
+    openvario-57-lvds-DS2.dtb openvario-57-lvds.dtb openvario-7-AM070-DS2.dtb \
+    openvario-7-CH070-DS2.dtb openvario-7-CH070.dtb \
+    openvario-7-PQ070.dtb"
+# The default device tree is for HDMI, and does not activate all serial ports.
+devicetree_file="sun7i-a20-cubieboard2.dtb"
+
 ( 
   echo " "
   echo "Rebuild the kernel"
@@ -474,8 +481,8 @@ build_kernel_deb () {
   then
     echo " "
     echo "Build the device tree image"
-    cp -v devicetree/*.dts src/kernel/arch/arm/boot/dts/
-    KDEB_COMPRESS=gzip $BUILDDIR/kernel/build.sh dtbs $DEVICETREE_FILES || exit 1
+    cp -v src/meta-openvario/recipes-kernel/linux/linux-mainline/*.dts src/kernel/arch/arm/boot/dts/  || exit 1
+    KDEB_COMPRESS=gzip $BUILDDIR/kernel/build.sh $DEVICETREE_CUSTOM_FILES || exit 1
   fi # if [ $TARGETARCH = armhf ]
 
   echo " "
@@ -531,7 +538,7 @@ load_module () {
 
     echo "${MODULE_NAME}" | sudo tee sdcard/etc/modules-load.d/mali.conf
     
-    sudo cp switch-to-lima.sh switch-to-mali.sh sdcard
+    sudo cp build/root/switch-to-lima.sh build/root/switch-to-mali.sh sdcard
     sudo chmod a-x sdcard/switch-to-lima.sh sdcard/switch-to-mali.sh
     sudo chmod u+x sdcard/switch-to-lima.sh sdcard/switch-to-mali.sh
 
@@ -605,13 +612,13 @@ fi
 ( cd sdcard/boot ; 
 echo "# setenv bootm_boot_mode sec
 setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1
-ext2load mmc 0 0x43000000 $devicetree_file
+ext2load mmc 0 0x43000000 openvario.dtb
 # Building the initrd is broken. The kernel boots without initrd just fine.
 # ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
 ext2load mmc 0 0x41000000 vmlinuz-$LINUX_VERSION
 # Skip the initrd in the boot command.
 # bootz 0x41000000 0x44000000 0x43000000
-bootz 0x41000000 - 0x43000000" |sudo tee boot.cmd || cleanup_and_exit_error
+bootz 0x41000000 - 0x43000000" |sudo tee boot.cmd || exit 1
 
 echo " "
 echo "Make boot script boot.scr from boot.cmd"
@@ -625,14 +632,23 @@ sudo mkimage -A arm -T script -C none -d boot.cmd boot.scr || cleanup_and_exit_e
 
 echo " "
 echo "Add boot script and device tree to the debian installer image"
+
 if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
 then
-    sudo cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $BUILDDIR/kernel/debian/tmp/boot
-    sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/*.dtb $BUILDDIR/kernel/debian/tmp/boot
+    DEB_DTB_TARGET_DIR=$BASEDIR/$BUILDDIR/kernel/debian/tmp/boot
 else
-    sudo cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $BUILDDIR/kernel/debian/linux-image/boot
-    sudo cp -v $BUILDDIR/kernel/arch/arm/boot/dts/*.dtb $BUILDDIR/kernel/debian/linux-image/boot
+    DEB_DTB_TARGET_DIR=$BASEDIR/$BUILDDIR/kernel/debian/linux-image/boot
 fi
+
+sudo cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
+pushd $BUILDDIR/kernel/arch/arm/boot/dts || cleanup_and_exit_error
+sudo cp -v $DEVICETREE_CUSTOM_FILES $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
+popd
+
+# Copy the target dtb to the fixed name used in the boot.cmd file
+pushd $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
+sudo ln -s $devicetree_file openvario.dtb || cleanup_and_exit_error
+popd
 
 } # make_u_boot_script ()
 
@@ -689,6 +705,15 @@ sudo chroot sdcard bin/bash -c "dpkg -i linux-image-$LINUX_VERSION*.deb linux-he
 sudo cp -v setup-ubuntu/etc/udev/rules.d/50-mali.rules sdcard/etc/udev/rules.d/
 
 } # install_kernel_deb ()
+
+select_display_device_tree() {
+    sudo cp build/root/select-display-device-tree.sh sdcard
+    sudo chmod a-x sdcard/select-display-device-tree.sh
+    sudo chmod u+x sdcard/select-display-device-tree.sh
+
+    sudo chroot sdcard /select-display-device-tree.sh
+
+} # select_display_device_tree
 
 # ==========================================
 install_linux_firmware () {
@@ -1033,6 +1058,7 @@ build_mali_module
 make_u_boot_script
 update_kernel_deb_package
 install_kernel_deb
+select_display_device_tree
 install_linux_firmware
 copy_installation_support
 install_u_boot
