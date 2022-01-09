@@ -79,7 +79,7 @@ do
             distris="testing"
             ;;
         y)
-            distris="hirsute"
+            distris="impish"
             ;;
         *)
             echo "Invalid input \"$x\"."
