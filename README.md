@@ -1,13 +1,13 @@
 *This file is part of horOpenVario*
 
-*Copyright (C) 2017-2021  Kai Horstmann*
+*Copyright (C) 2017-2022  Kai Horstmann*
 
 # Open Vario on Cubieboard 2 running Ubuntu or Debian
 ## horOpenVario
 
 This repository is the main repository of [horOpenVario](https://github.com/hor63/horOpenVario.git).
 
-This build system builds a complete Linux installation for a *Cubiebaord 2* with an Allwinner A20 (sun7i) SOC.   
+This build system builds a complete Linux installation for a *Cubiebaord 2* with an [Allwinner A20](https://linux-sunxi.org/A20) (sun7i) SOC.   
 It is intended to run [XCSoar](https://xcsoar.org)
 
 This build system creates a SD card image containing a ready-to-run Linux system.
@@ -22,7 +22,7 @@ It includes
   - Complete development package to compile XCSoar directly on the Cubieboard
   - **Working** OpenGL ES 2.0 Mali acceleration either with
     -  Closed-source MALI blob, and out-of-tree Mali driver
-    -  Open-source LIMA driver in the kernel, and Mesa client side (Ubuntu Focal and Hirsute as well as Debian already bring a version of Mesa with working Lima driver)
+    -  Open-source LIMA driver in the kernel, and Mesa client side (Ubuntu Focal, Hirsute and Impish as well as Debian already bring a version of Mesa with working Lima driver)
 
 
 ## Checkout the repository
@@ -42,7 +42,7 @@ or initialize and load the sub-modules separately.
 
 ## Prerequisites and systems
 
-My host system for buildng is Ubuntu 21.04 (Hirsute).
+My host system for buildng is Ubuntu 21.10 (Impish).
 I also tested Debian Stable (Bullseye) and Testing (Bookworm) from a `debootstrap` installation with `chroot` under the Ubuntu kernel.  
 I *highly* recomment to use the same distribution and version for host and target system.
 This makes cross-compilation rather painless because compiler and runtime libs in the target system are fitting seamlessly when you cross-compile on the host.
@@ -58,14 +58,14 @@ Options are:
 - `--no-pause`: Do not stop before every step of the build process but run as much as possible automatically. Stop only when a real input is required.
 - `--with-mali`: Load the `mali` module for the closed-source Mali blob at boot time.  
   By default start the system with the open-source `lima` module.   
-  Please note that even with --with-mali the OSS Lima kernel module is being built and installed. It is just blacklisted. Instead the cole-source Mali module is loaded by default.
+  Please note that even with --with-mali the OSS Lima kernel module is being built and installed. It is just blacklisted. Instead the closed-source Mali module is loaded by default.
   Also the proprietary Mali blob is provided in the root directory as .deb image when you later decide to switch from Lima to Mali.
 
 Without `--no-pause` the script will stop at any step and print a text explaining what comes next. Continue just hitting `Enter`.  
 Be careful not blindly hitting enter each time the script stops however. There are questions and actual input required along the way.  
 
 Questions which will be asked or options to be chosen are:
-- Select the Ubuntu version to be installed (Hirsute (21.04) version is default. Required for the most recent XCSoar due to GCC and Lua version requirements).
+- Select the Ubuntu version to be installed (Impish (21.10) version is default. Required for the most recent XCSoar due to GCC and Lua version requirements).
 - If you re-use a previously downloaded base installation tarball when you run `./makenewimage.sh` multiple times, or download it again (default is re-use).
 - `root` password of the new system. The system will have by default a working root user. Use it at your own risk.
 - Use of an APT proxy. It requires a working `apt-proxy` installation in your network (`apt-proxy-ng` is proven to be *not* reliable). Default is not using a cache.  
@@ -79,7 +79,7 @@ Questions which will be asked or options to be chosen are:
   Example is the symbolic link `/lib/arm-linux-gnueabihf/libz.so` -> `/lib/arm-linux-gnueabihf/libz.so.1.2.11`. When you are cross-compiling with a root file system of the
   target system like `/home/foo/horOpenVario/sdcard` the symbolic link of `lib/libz.so` *should* point to
   `/home/foo/horOpenVario/sdcard/lib/arm-linux-gnueabihf/libz.so.1.2.11` but with the absolute path it points to `/lib/arm-linux-gnueabihf/libz.so.1.2.11`. But there is noting.  
-  Therefore symbolic links are created from `/lib/arm-linux-gnueabihf` to your SD card image. This has not adverse side effect which I am aware of. But be warned that the script does stuff to your `/lib/arm-linux-gnueabihf` directory.
+  Therefore the symbolic links are re-created from pointing to `/lib/arm-linux-gnueabihf` to pointing relatively to the same directory. This has no adverse side effect which I am aware of.
 - Interactively select the timezone in which the Cubie is located.
 - Interactively select the locale(s) you want to install. Select *at least* `en_US.UTF-8`. Otherwise you may get funny error messages, particularly from Python based stuff.
 - Select the keyboard type, and layout (English, German...).
@@ -110,10 +110,11 @@ When you install the development package on the image you can build mainline XCS
 When the Mali driver is active you simply run `make` (optionally with DEBUG=n and -j2). `make` finds the /dev/mali device, and compiles against the Mali blob.
 
 ### For Lima
-As a first test you may want [download KMSCUBE from freedesktop.org](https://gitlab.freedesktop.org/mesa/kmscube.git) and compile it to verify if hardware acceleration with Lima is actually active and working. The program spits out a lot of information about EGL and OPENGL ES 2.0.
+As a first test you may want to install *kmscube* either with `apt-get` or [download kmscube from freedesktop.org](https://gitlab.freedesktop.org/mesa/kmscube.git) and compile it to verify if hardware acceleration with Lima is actually active and working. Installing the ready-made package is of course a lot easier, and works.
+The program spits out a lot of information about EGL and OPENGL ES 2.0.
 
 When you have Lima active you can compile XCSoar with `make ENABLE_MESA_KMS=y`.
-You need to start it for the DRI device /dev/card1 like on PI 4.
+You need to start it for the DRI device /dev/card1 like on PI 4. Most recent versions of XCSoar find the appropriate device themselves.
 
 ### For X11 with Lima acceleration (proof of concept)
 If you feel frisky you can install a graphical desktop (I tested `apt-get install lubuntu-desktop`), and compile XCSoar with `make OPENGL=y GLES2=y` for X11 with Lima acceleration.
@@ -125,4 +126,7 @@ After building the SD card image sd.img you can mount the image with `mountSDIma
 
 Cross-compiling with `make TARGET=CUBIE CUBIE=<path to the root file system>` by default compiles for the Mali blob. In the recent HEAD version the build automatically deals with different native EGL window structures for the old headers for the 3.4 kernel, and the mainline kernel package from Bootlin.
 
-You can now cross-compile the most recent version also for Mesa/KMS with `make TARGET=CUBIE CUBIE=<path to the root file system> ENABLE_MESA_KMS=y`.
+You can now cross-compile the most recent version also for Mesa/KMS with
+```
+make TARGET=CUBIE CUBIE=<path to the root file system> ENABLE_MESA_KMS=y
+```
