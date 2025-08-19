@@ -53,8 +53,7 @@ do
     echo "Selection of distributions which can be installed."
     echo "Enter:"
     echo "  f - Focal  - LTS"
-    echo "  h - Hirsute"
-    echo "  i - Impish  (default)"
+    echo "  n - Noble  (default)"
     echo " "
     echo " Debian releases:"
     echo "  ds - Debian stable"
@@ -66,11 +65,8 @@ do
         yf)
             distris="focal"
             ;;
-        yh)
-            distris="hirsute"
-            ;;
-        yi)
-            distris="impish"
+        yn)
+            distris="noble"
             ;;
         yds)
             distris="stable"
@@ -79,7 +75,7 @@ do
             distris="testing"
             ;;
         y)
-            distris="impish"
+            distris="noble"
             ;;
         *)
             echo "Invalid input \"$x\"."
@@ -377,6 +373,7 @@ sudo chroot sdcard /bin/bash -c "apt-get -y install\
     nfs-common \
     net-tools ifupdown \
     openssh-server \
+    libssl-dev \
     bluetooth \
     sudo" || cleanup_and_exit_error
 
@@ -453,10 +450,10 @@ build_kernel_deb () {
 pushd src/meta-openvario/recipes-kernel/linux/linux-mainline  || exit 1
 DEVICETREE_CUSTOM_SOURCES=`echo *.dts`
 popd
-DEVICETREE_CUSTOM_FILES="sun7i-a20-cubieboard2.dtb \
-    openvario-57-lvds-DS2.dtb openvario-57-lvds.dtb openvario-7-AM070-DS2.dtb \
-    openvario-7-CH070-DS2.dtb openvario-7-CH070.dtb \
-    openvario-7-PQ070.dtb"
+DEVICETREE_CUSTOM_FILES="allwinner/sun7i-a20-cubieboard2.dtb \
+    allwinner/openvario-57-lvds-DS2.dtb allwinner/openvario-57-lvds.dtb allwinner/openvario-7-AM070-DS2.dtb \
+    allwinner/openvario-7-CH070-DS2.dtb allwinner/openvario-7-CH070.dtb \
+    allwinner/openvario-7-PQ070.dtb"
 # The default device tree is for HDMI, and does not activate all serial ports.
 devicetree_file="sun7i-a20-cubieboard2.dtb"
 
@@ -481,46 +478,43 @@ devicetree_file="sun7i-a20-cubieboard2.dtb"
   then
     echo " "
     echo "Build the device tree image"
-    cp -v src/meta-openvario/recipes-kernel/linux/linux-mainline/*.dts src/kernel/arch/arm/boot/dts/  || exit 1
+    cp -v src/meta-openvario/recipes-kernel/linux/linux-mainline/*.dts src/kernel/arch/arm/boot/dts/allwinner  || exit 1
     KDEB_COMPRESS=gzip $BUILDDIR/kernel/build.sh $DEVICETREE_CUSTOM_FILES || exit 1
   fi # if [ $TARGETARCH = armhf ]
 
   echo " "
   echo "Build Debian kernel package"
-  KDEB_COMPRESS=gzip $BUILDDIR/kernel/build.sh -j4 bindeb-pkg || exit 1
+  KDEB_COMPRESS=gzip DPKG_FLAGS=-d $BUILDDIR/kernel/build.sh -j4 bindeb-pkg || exit 1
   
 ) || cleanup_and_exit_error  
 
-if [ -d build/kernel/debian/tmp/lib/modules ]
+if [ -d $BUILDDIR/kernel/debian/tmp/lib/modules ]
 then
 LINUX_VERSION=`basename $BUILDDIR/kernel/debian/tmp/lib/modules/*`
 else
-LINUX_VERSION=`basename $BUILDDIR/kernel/debian/linux-image/lib/modules/*`
+  if [ -f $BUILDDIR/kernel/debian/linux-image*.substvars ]
+  then
+    KERNEL_IMAGE_DIR=`basename $BUILDDIR/kernel/debian/linux-image*.substvars .substvars`
+  else
+    KERNEL_IMAGE_DIR=`basename $BUILDDIR/kernel/debian/linux-image*`
+  fi
+  if [ ! -d $BUILDDIR/kernel/debian/"$KERNEL_IMAGE_DIR" ]
+  then
+    echo Error: Kernel image directory \"$BUILDDIR/kernel/debian/$KERNEL_IMAGE_DIR\" does not exist.
+    cleanup_and_exit_error
+  fi
+  if [ -d $BUILDDIR/kernel/debian/$KERNEL_IMAGE_DIR/lib/modules/* ]
+  then
+    LINUX_VERSION=`basename $BUILDDIR/kernel/debian/$KERNEL_IMAGE_DIR/lib/modules/*`
+  else 
+    echo "Error: Directory $BUILDDIR/kernel/debian/$KERNEL_IMAGE_DIR/lib/modules/* does not exist to determine the Linux version"
+    cleanup_and_exit_error
+  fi
 fi
 echo " "
 echo "LINUX_VERSION = $LINUX_VERSION"
 
 } # build_kernel_deb ()
-
-
-
-# ==========================================
-blacklist_module () {
-
-    local MODULE_NAME=$1
-
-    echo " "
-    echo "Blacklist the ${MODULE_NAME} module"
-    if test $NO_PAUSE = 0
-    then
-      echo "Hit enter to continue"
-      read x
-    fi
-
-    echo "blacklist ${MODULE_NAME}" | sudo tee sdcard/etc/modprobe.d/blacklist-mali.conf
-    
-} # blacklist_module
-
 
 
 # ==========================================
@@ -537,66 +531,8 @@ load_module () {
     fi
 
     echo "${MODULE_NAME}" | sudo tee sdcard/etc/modules-load.d/mali.conf
-    
-    sudo cp build/root/switch-to-lima.sh build/root/switch-to-mali.sh sdcard
-    sudo chmod a-x sdcard/switch-to-lima.sh sdcard/switch-to-mali.sh
-    sudo chmod u+x sdcard/switch-to-lima.sh sdcard/switch-to-mali.sh
 
 } # load_module
-
-
-
-# ==========================================
-build_mali_module () {
-
-if [ $TARGETARCH = armhf ]
-then
-
-    ( 
-    echo " "
-    echo "Build the Mali kernel module"
-    if test $NO_PAUSE = 0
-    then
-      echo "Hit enter to continue"
-      read x
-    fi
-    cd src/sunxi-mali
-    
-    # Clean the structure and prepare for a new build in case of a previous failure
-    CROSS_COMPILE=arm-linux-gnueabi- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -c >/dev/null 2>&1
-
-    CROSS_COMPILE=arm-linux-gnueabi- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -b || exit 1
-
-    ) || cleanup_and_exit_error
-
-
-    ( 
-    echo " "
-    echo "Install the Mali kernel module in the kernel DEB image"
-    if test $NO_PAUSE = 0
-    then
-    echo "Hit enter to continue"
-    read x
-    fi
-    cd src/sunxi-mali
-    
-    #sudo CROSS_COMPILE=arm-linux-gnueabi- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/sdcard ./build.sh -r r6p2 -i || cleanup_and_exit_error
-        if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
-        then
-            CROSS_COMPILE=arm-linux-gnueabi- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/$BUILDDIR/kernel/debian/tmp ./build.sh -r r8p1 -i || exit 1
-        else
-            CROSS_COMPILE=arm-linux-gnueabi- KDIR=$BASEDIR/$BUILDDIR/kernel INSTALL_MOD_PATH=$BASEDIR/$BUILDDIR/kernel/debian/linux-image ./build.sh -r r8p1 -i || exit 1
-        fi
-
-    # undo the patches. Otherwise the next build will fail because applying the patches is part of the build option of build.sh
-    CROSS_COMPILE=${ARCH_PREFIX}- KDIR=$BASEDIR/$BUILDDIR/kernel ./build.sh -r r8p1 -c
-    exit 0
-
-    ) || cleanup_and_exit_error
-
-fi # if [ $TARGETARCH = armhf ]
-
-} # build_mali_module ()
 
 # ==========================================
 make_u_boot_script () {
@@ -637,7 +573,8 @@ if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
 then
     DEB_DTB_TARGET_DIR=$BASEDIR/$BUILDDIR/kernel/debian/tmp/boot
 else
-    DEB_DTB_TARGET_DIR=$BASEDIR/$BUILDDIR/kernel/debian/linux-image/boot
+    # DEB_DTB_TARGET_DIR=$BASEDIR/$BUILDDIR/kernel/debian/linux-image/boot
+    DEB_DTB_TARGET_DIR="$BASEDIR/$BUILDDIR/kernel/debian/$KERNEL_IMAGE_DIR/boot"
 fi
 
 sudo cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
@@ -664,13 +601,13 @@ fi
 
 (
     echo " "
-    echo "Re-build the linux image package including MALI and boot script"
+    echo "Re-build the linux image package including the boot script"
     cd $BASEDIR/$BUILDDIR/kernel
     if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
     then
         dpkg-deb -Zgzip --root-owner-group  --build "debian/tmp" .. || exit 1
     else
-        dpkg-deb -Zgzip --root-owner-group  --build "debian/linux-image" .. || exit 1
+        dpkg-deb -Zgzip --root-owner-group  --build "debian/$KERNEL_IMAGE_DIR" .. || exit 1
     fi
 )
 
@@ -700,9 +637,6 @@ sudo cp -v $BUILDDIR/linux-*$LINUX_VERSION*.deb sdcard
 sudo chroot sdcard bin/bash -c "dpkg -i linux-image-$LINUX_VERSION*.deb linux-headers-$LINUX_VERSION*.deb linux-libc-dev_$LINUX_VERSION*.deb" || exit 1
 
 ) || cleanup_and_exit_error  
-
-# Assign group "video" to the mali device node.
-sudo cp -v setup-ubuntu/etc/udev/rules.d/50-mali.rules sdcard/etc/udev/rules.d/
 
 } # install_kernel_deb ()
 
@@ -771,6 +705,7 @@ then
 echo "Hit enter to continue"
 read x
 fi
+echo "sudo dd if=$BUILDDIR/u-boot/u-boot-sunxi-with-spl.bin of=${LOOPDEV} bs=1024 seek=8"
 sudo dd if=$BUILDDIR/u-boot/u-boot-sunxi-with-spl.bin of=${LOOPDEV} bs=1024 seek=8 || cleanup_and_exit_error
 
 fi # if [ $TARGETARCH = armhf ]
@@ -829,10 +764,7 @@ then
 
   cat sdcard/dev-packages.txt | xargs sudo apt-get -y install || cleanup_and_exit_error
   
-  if test $WITH_MALI = 0
-  then
-    sudo chroot sdcard /bin/bash -c "cat /mesa-dev-packages.txt |xargs apt-get -y install" || cleanup_and_exit_error
-  fi
+  sudo chroot sdcard /bin/bash -c "cat /mesa-dev-packages.txt |xargs apt-get -y install" || cleanup_and_exit_error
 
 # Cross tools are useless on the target machine.
   cat sdcard/mesa-dev-packages.txt | \
@@ -865,63 +797,6 @@ sudo chroot sdcard /bin/bash -c "apt-get -y update"
 sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
 
 } # config_locale_keyboard ()
-
-# ==========================================
-build_mali_blob_deb () {
-
-local MALI_VERSION=$1
-local MALI_PATCH=$2
-local INSTALL_MALI_BLOB=$3
-
-echo " "
-echo "Build the Debian installer for the Mali R${MALI_VERSION}P${MALI_PATCH} blob and includes"
-if test $NO_PAUSE = 0
-then
-echo "Hit enter to continue"
-read x
-fi
-
-sudo rm -rf build/mali-deb/* || cleanup_and_exit_error
-mkdir -p build/mali-deb/DEBIAN || cleanup_and_exit_error
-echo "Package: arm-mali-400-fbdev-blob
-Version: $MALI_VERSION.$MALI_PATCH
-Section: custom
-Priority: optional
-Architecture: armhf
-Essential: no
-Installed-Size: 1060
-Maintainer: https://github.com/hor63/horOpenVario
-Description: MALI R${MALI_VERSION}P${MALI_PATCH} userspace blob for fbdev device" > build/mali-deb/DEBIAN/control
-
-mkdir build/mali-deb/usr || cleanup_and_exit_error
-mkdir build/mali-deb/usr/include || cleanup_and_exit_error
-mkdir build/mali-deb/usr/lib || cleanup_and_exit_error
-mkdir build/mali-deb/usr/lib/${ARCH_PREFIX} || cleanup_and_exit_error
-cp -Rpv src/mali-blobs/include/fbdev/* build/mali-deb/usr/include/ || cleanup_and_exit_error
-cp -Rpv src/mali-blobs/r${MALI_VERSION}p${MALI_PATCH}/arm/fbdev/lib* build/mali-deb/usr/lib/${ARCH_PREFIX}/ || cleanup_and_exit_error
-find build/mali-deb/usr/ -type d |xargs chmod -v 755 
-find build/mali-deb/usr/include -type f |xargs chmod -v 644
-find build/mali-deb/usr/lib -type f |xargs chmod -v 755
-dpkg-deb -Zgzip --root-owner-group --build build/mali-deb || cleanup_and_exit_error
-sudo mv -v build/mali-deb.deb sdcard/mali-deb-R${MALI_VERSION}P${MALI_PATCH}.deb || cleanup_and_exit_error
-
-if [ "y$INSTALL_MALI_BLOB" = yy ]
-then
-  echo " "
-  echo "Install the Mali R${MALI_VERSION}P${MALI_PATCH} blob and includes"
-  if test $NO_PAUSE = 0
-  then
-  echo "Hit enter to continue"
-  read x
-  fi
-  sudo chroot sdcard bin/bash -c "dpkg -i mali-deb-R${MALI_VERSION}P${MALI_PATCH}.deb" || cleanup_and_exit_error
-  
-  # load the MALI module at boot time.
-  echo mali | sudo tee -a sdcard/etc/modules > /dev/null
-
-fi # if [ "y$INSTALL_MALI_BLOB" = yy ]  
-
-} # build_mali_blob_deb ()
 
 # ==========================================
 # Ubuntu and Debian sym-link a lot of shared libraries with an absolute path
@@ -1024,12 +899,6 @@ then
 	APT_GET_OPT="$APT_GET_OPT -y --allow-downgrades"
 fi
 
-WITH_MALI=0
-if test x"$1" = "x--with-mali" || test x"$2" = "x--with-mali"
-then
-	WITH_MALI=1
-fi
-
 BASEDIR=`dirname $0`
 BASEDIR="`(cd \"$BASEDIR\" ; BASEDIR=\`pwd\`; echo \"$BASEDIR\")`"
 
@@ -1054,7 +923,6 @@ install_complete_base_system
 install_network_management
 rebuild_u_boot
 build_kernel_deb
-build_mali_module
 make_u_boot_script
 update_kernel_deb_package
 install_kernel_deb
@@ -1064,20 +932,8 @@ copy_installation_support
 install_u_boot
 install_dev_packages
 load_module sun4i-codec
-build_mali_blob_deb 6 2
-if $WITH_MALI = 1
-then
-    # build AND install the blob, and headers.
-    build_mali_blob_deb 8 1 y
-    # Prevent the lima module from colliding with mali
-    blacklist_module lima
-    load_module mali
-else
-    build_mali_blob_deb 8 1
-    # Prevent the mali module from colliding with lima
-    blacklist_module mali
-    load_module lima
-fi
+load_module lima
+#fi
 finish_installation
 
 echo "Copy the SD card image \"sd.img\" to the SD card raw device"  
