@@ -1,0 +1,9 @@
+
+# include the generated file containing the linux version
+# from the debian package build of the kernel
+include build/kernel/debian/rules.vars
+
+
+# Just print the linux version variable.
+all:
+	@echo $(KERNELRELEASE)

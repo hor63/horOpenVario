@@ -488,31 +488,17 @@ devicetree_file="sun7i-a20-cubieboard2.dtb"
   
 ) || cleanup_and_exit_error  
 
-if [ -d $BUILDDIR/kernel/debian/tmp/lib/modules ]
-then
-LINUX_VERSION=`basename $BUILDDIR/kernel/debian/tmp/lib/modules/*`
-else
-  if [ -f $BUILDDIR/kernel/debian/linux-image*.substvars ]
-  then
-    KERNEL_IMAGE_DIR=`basename $BUILDDIR/kernel/debian/linux-image*.substvars .substvars`
-  else
-    KERNEL_IMAGE_DIR=`basename $BUILDDIR/kernel/debian/linux-image*`
-  fi
-  if [ ! -d $BUILDDIR/kernel/debian/"$KERNEL_IMAGE_DIR" ]
-  then
-    echo Error: Kernel image directory \"$BUILDDIR/kernel/debian/$KERNEL_IMAGE_DIR\" does not exist.
-    cleanup_and_exit_error
-  fi
-  if [ -d $BUILDDIR/kernel/debian/$KERNEL_IMAGE_DIR/lib/modules/* ]
-  then
-    LINUX_VERSION=`basename $BUILDDIR/kernel/debian/$KERNEL_IMAGE_DIR/lib/modules/*`
-  else 
-    echo "Error: Directory $BUILDDIR/kernel/debian/$KERNEL_IMAGE_DIR/lib/modules/* does not exist to determine the Linux version"
-    cleanup_and_exit_error
-  fi
-fi
+LINUX_VERSION=`make -f makefilePrintKernelVersion`  || cleanup_and_exit_error
+
+KERNEL_IMAGE_DIR=linux-image-$LINUX_VERSION
+
 echo " "
 echo "LINUX_VERSION = $LINUX_VERSION"
+if test $NO_PAUSE = 0
+then
+  echo "Hit enter to continue"
+  read x
+fi
 
 } # build_kernel_deb ()
 
@@ -569,13 +555,7 @@ sudo mkimage -A arm -T script -C none -d boot.cmd boot.scr || cleanup_and_exit_e
 echo " "
 echo "Add boot script and device tree to the debian installer image"
 
-if [ -d $BASEDIR/$BUILDDIR/kernel/debian/tmp ]
-then
-    DEB_DTB_TARGET_DIR=$BASEDIR/$BUILDDIR/kernel/debian/tmp/boot
-else
-    # DEB_DTB_TARGET_DIR=$BASEDIR/$BUILDDIR/kernel/debian/linux-image/boot
-    DEB_DTB_TARGET_DIR="$BASEDIR/$BUILDDIR/kernel/debian/$KERNEL_IMAGE_DIR/boot"
-fi
+DEB_DTB_TARGET_DIR="$BASEDIR/$BUILDDIR/kernel/debian/$KERNEL_IMAGE_DIR/boot"
 
 sudo cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
 pushd $BUILDDIR/kernel/arch/arm/boot/dts || cleanup_and_exit_error
