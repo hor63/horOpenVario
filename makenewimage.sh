@@ -26,13 +26,13 @@ cleanup_and_exit_error () {
 
 echo "Unmount the SD card image"  
 sync
-sudo umount sdcard/sys
-sudo umount sdcard/proc
-sudo umount sdcard/dev/pts
-sudo umount sdcard/dev
-sudo umount sdcard/boot
-sudo umount sdcard
-sudo losetup -d ${LOOPDEV}
+$SUDO umount sdcard/sys
+$SUDO umount sdcard/proc
+$SUDO umount sdcard/dev/pts
+$SUDO umount sdcard/dev
+$SUDO umount sdcard/boot
+$SUDO umount sdcard
+$SUDO losetup -d ${LOOPDEV}
 
 exit 1
 } # cleanup_and_exit_error ()
@@ -93,6 +93,37 @@ do
 done
 } # select_distribution ()
 
+
+# ==========================================
+ask_apt_cache () {
+echo " "
+echo "Do you want to use a local APT-Proxy? [y|N]"
+echo "  To use this feature you must have apt-cacher installed."
+echo "  \"apt-cacher-ng\" does not work correctly. "
+echo "    If you have installed apt-cacher-ng answer 'n'"
+read x
+if [ y$x = yy -o y$x = yY ]
+then
+    APT_PROXY_HOST=localhost
+    APT_PROXY_PORT=3142
+
+    echo "Enter the proxy host [localhost]"
+    read x
+    if [ y$x != y ]
+    then
+        APT_PROXY_HOST="$x"
+    fi
+
+    echo "Enter the proxy port [3142]"
+    read x
+    if [ y$x != y ]
+    then
+        APT_PROXY_PORT="$x"
+    fi
+
+  fi
+} # ask_apt_cache ()
+
 # ==========================================
 install_build_packages () {
 echo ""
@@ -104,8 +135,8 @@ echo "Hit enter to continue"
 read x
 fi
 
-sudo apt-get $APT_GET_OPT update
-sudo apt-get $APT_GET_OPT  install \
+$SUDO apt-get $APT_GET_OPT update
+$SUDO apt-get $APT_GET_OPT  install \
   `cat build-packages.txt`
 
 } # install_build_packages ()
@@ -136,7 +167,7 @@ p
 
 p
 w
-q" | sudo fdisk sd.img || exit 1
+q" | $SUDO fdisk sd.img || exit 1
 
 } # create_partition_sd_image ()
 
@@ -151,7 +182,7 @@ echo "Hit enter to continue"
 read x
 fi
 
-LOOPDEV=`sudo losetup -f`
+LOOPDEV=`$SUDO losetup -f`
 if test -z "$LOOPDEV"
 then 
     echo "No loop device available. Stop."
@@ -159,16 +190,16 @@ then
 else
     echo "Using loop device ${LOOPDEV}"
 fi
-sudo losetup ${LOOPDEV} sd.img || exit 1
-sudo partprobe ${LOOPDEV} || cleanup_and_exit_error
-sudo mkfs.ext2 -F ${LOOPDEV}p1 || cleanup_and_exit_error
-sudo mkfs.ext2 -F ${LOOPDEV}p2 || cleanup_and_exit_error
+$SUDO losetup ${LOOPDEV} sd.img || exit 1
+$SUDO partprobe ${LOOPDEV} || cleanup_and_exit_error
+$SUDO mkfs.ext2 -v -F ${LOOPDEV}p1 || cleanup_and_exit_error
+$SUDO mkfs.ext4 -t ext4 -v -F ${LOOPDEV}p2 || cleanup_and_exit_error
 
 mkdir -p sdcard
 
-sudo mount -v -o defaults,noatime ${LOOPDEV}p2 sdcard || cleanup_and_exit_error
-sudo mkdir -p sdcard/boot || cleanup_and_exit_error
-sudo mount -v -o defaults,noatime ${LOOPDEV}p1 sdcard/boot || cleanup_and_exit_error
+$SUDO mount -v -o defaults,noatime ${LOOPDEV}p2 sdcard || cleanup_and_exit_error
+$SUDO mkdir -p sdcard/boot || cleanup_and_exit_error
+$SUDO mount -v -o defaults,noatime ${LOOPDEV}p1 sdcard/boot || cleanup_and_exit_error
 
 } # format_mount_sd_image ()
 
@@ -189,25 +220,25 @@ echo "DEBOOTSTRAP_CACHE=$DEBOOTSTRAP_CACHE"
 
 if [ -f $DEBOOTSTRAP_CACHE ]
 then
-if test $NO_PAUSE = 0
-then
+  if test $NO_PAUSE = 0
+  then
     echo " "
     echo "The root file system cache $DEBOOTSTRAP_CACHE is already here."
     echo "  Do you want to keep it? [Yn]"
     read x
     if [ "$x" == "n" -o "$x" == "N" ]
     then
-        sudo rm $DEBOOTSTRAP_CACHE
+        $SUDO rm $DEBOOTSTRAP_CACHE
     fi
-    fi
+  fi
 fi
 
 if [ ! -f $DEBOOTSTRAP_CACHE ]
 then
     echo " "
     echo "Download base packages for $distris distribution and store them in $DEBOOTSTRAP_CACHE"
-    sudo rm -rf tmp/*
-    sudo debootstrap --verbose --arch=$TARGETARCH --make-tarball=$DEBOOTSTRAP_CACHE $distris tmp || cleanup_and_exit_error
+    $SUDO rm -rf tmp/*
+    $SUDO debootstrap --verbose --arch=$TARGETARCH --make-tarball=$DEBOOTSTRAP_CACHE $distris tmp || cleanup_and_exit_error
 fi
 
 } # download_base_system_tarball ()
@@ -217,13 +248,13 @@ install_base_system () {
 
 echo " "
 echo "Create the root file system for $distris distribution with:"
-echo "\"sudo debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACHE $distris sdcard \""
+echo "\"$SUDO debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACHE $distris sdcard \""
 if test $NO_PAUSE = 0
 then
 echo "Hit enter to continue"
 read x
 fi
-sudo debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACHE $distris sdcard || cleanup_and_exit_error
+$SUDO debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACHE $distris sdcard || cleanup_and_exit_error
 
 } # install_base_system ()
 
@@ -231,14 +262,10 @@ sudo debootstrap --verbose --arch=$TARGETARCH --unpack-tarball=$DEBOOTSTRAP_CACH
 update_base_system () {
 
 # Mount the dynamic kernel managed file systems for a pleasant CHROOT experience
-sudo mount -v -t sysfs sysfs sdcard/sys
-sudo mount -v -t proc proc sdcard/proc
-sudo mount -v -t devtmpfs udev sdcard/dev
-sudo mount -v -t devpts devpts sdcard/dev/pts
-
-echo " "
-echo "Please enter the new root password of the target image"
-sudo chroot sdcard /bin/bash -c "passwd root"
+$SUDO mount -v -t sysfs sysfs sdcard/sys
+$SUDO mount -v -t proc proc sdcard/proc
+$SUDO mount -v -t devtmpfs udev sdcard/dev
+$SUDO mount -v -t devpts devpts sdcard/dev/pts
 
 
 echo " "
@@ -251,7 +278,7 @@ fi
 # Read the server name from the initial sources.list.
 if [ ! -f sdcard/etc/apt/sources.list.bak ]
 then
-    sudo mv sdcard/etc/apt/sources.list sdcard/etc/apt/sources.list.bak || cleanup_and_exit_error
+    $SUDO mv sdcard/etc/apt/sources.list sdcard/etc/apt/sources.list.bak || cleanup_and_exit_error
     (
       # Debian has a different repository layout than Ubuntu
       if test $distris = "stable" -o $distris = "testing"
@@ -279,7 +306,7 @@ then
               done
           done
       done
-  ) | sudo tee sdcard/etc/apt/sources.list || cleanup_and_exit_error
+  ) | $SUDO tee sdcard/etc/apt/sources.list || cleanup_and_exit_error
 fi
 
 echo " "
@@ -290,38 +317,14 @@ echo "Hit enter to continue"
 read x
 fi
 
-echo " "
-echo "Do you want to use a local APT-Proxy? [y|N]"
-echo "  To use this feature you must have apt-cacher installed."
-echo "  \"apt-cacher-ng\" does not work correctly. "
-echo "    If you have installed apt-cacher-ng answer 'n'"
-read x
-if [ y$x = yy -o y$x = yY ]
+if [ n$APT_PROXY_HOST != n ]
 then
-    APT_PROXY_HOST=localhost
-    APT_PROXY_PORT=3142
-
-    echo "Enter the proxy host [localhost]"
-    read x
-    if [ y$x != y ]
-    then
-        APT_PROXY_HOST="$x"
-    fi
-
-    echo "Enter the proxy port [3142]"
-    read x
-    if [ y$x != y ]
-    then
-        APT_PROXY_PORT="$x"
-    fi
-
-    echo "Acquire::http::Proxy \"http://$APT_PROXY_HOST:$APT_PROXY_PORT\";" | sudo tee sdcard/etc/apt/apt.conf.d/00aptproxy
+      echo "Acquire::http::Proxy \"http://$APT_PROXY_HOST:$APT_PROXY_PORT\";" | $SUDO tee sdcard/etc/apt/apt.conf.d/00aptproxy
 fi
 
+LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "apt-get -y update"
 
-LANG=C.UTF-8 LC_ALL=C sudo chroot sdcard /bin/bash -c "apt-get -y update"
-
-LANG=C.UTF-8 LC_ALL=C sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
+LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
 
 } # update_base_system ()
 
@@ -344,14 +347,8 @@ echo "# /etc/fstab: static file system information.
 # <file system> <mount point>   <type>  <options>       <dump>  <pass>
 /dev/mmcblk0p2       /               ext2    defaults,noatime,errors=remount-ro 0       1
 /dev/mmcblk0p1       /boot           ext2    defaults,noatime 0       1
-" | sudo tee sdcard/etc/fstab 
+" | $SUDO tee sdcard/etc/fstab
 
-echo " "
-echo "Please enter the host name of the target computer"
-read x
-# Make the hostname permanent in the hostname file.
-# By default it is set to the name of the build machine.
-echo $x |sudo tee sdcard/etc/hostname >/dev/null
 
 echo " "
 echo "Install initramfs tools"
@@ -366,7 +363,7 @@ then
 echo "Hit enter to continue"
 read x
 fi
-sudo chroot sdcard /bin/bash -c "apt-get -y install\
+LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "apt-get -y install\
     initramfs-tools u-boot-tools \
     command-not-found bash-completion \
     avahi-daemon avahi-utils libnss-mdns parted fdisk \
@@ -388,20 +385,26 @@ sudo chroot sdcard /bin/bash -c "apt-get -y install\
 # ==========================================
 install_network_management () {
 
-echo " "
-echo "Do you want to configure network adapters, WiFi... manually"
-echo "  or menu based with nmtui (network manager text UI)?"
-echo "Please enter 'n'(mtui)  or 'm'(anual). Default 'n'"
-read x
-
-if [ y$x = "y" ]
+if test $NO_PAUSE = 0
 then
-    x=n
+  echo " "
+  echo "Do you want to configure network adapters, WiFi... manually"
+  echo "  or menu based with nmtui (network manager text UI)?"
+  echo "Please enter 'n'(mtui)  or 'm'(anual). Default 'n'"
+  read x
+
+  if [ y$x = "y" ]
+  then
+      x=n
+  fi
+else
+  x=n
 fi
 
 if [ y$x = "yn" ]
 then
-    sudo chroot sdcard /bin/bash -c "apt-get -y install network-manager" || echo "Please run \"apt-get reinstall network-manager\" after booting the target device."
+    LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "apt-get -y install network-manager" || \
+      echo "Please run \"apt-get reinstall network-manager\" after booting the target device."
     echo "Please run \"nmtui\" to configure the network after booting the target device"
     if test $NO_PAUSE = 0
     then
@@ -422,7 +425,7 @@ iface usb0 inet6 auto
 # auto eth0
 allow-hotplug eth0
 iface eth0 inet dhcp
-iface eth0 inet6 auto" | sudo tee -a sdcard/etc/network/interfaces
+iface eth0 inet6 auto" | $SUDO tee -a sdcard/etc/network/interfaces
 
 } # install_network_management ()
 
@@ -516,7 +519,7 @@ load_module () {
       read x
     fi
 
-    echo "${MODULE_NAME}" | sudo tee sdcard/etc/modules-load.d/mali.conf
+    echo "${MODULE_NAME}" | $SUDO tee sdcard/etc/modules-load.d/mali.conf
 
 } # load_module
 
@@ -540,7 +543,7 @@ ext2load mmc 0 0x43000000 openvario.dtb
 ext2load mmc 0 0x41000000 vmlinuz-$LINUX_VERSION
 # Skip the initrd in the boot command.
 # bootz 0x41000000 0x44000000 0x43000000
-bootz 0x41000000 - 0x43000000" |sudo tee boot.cmd || exit 1
+bootz 0x41000000 - 0x43000000" |$SUDO tee boot.cmd || exit 1
 
 echo " "
 echo "Make boot script boot.scr from boot.cmd"
@@ -549,7 +552,7 @@ then
 echo "Hit enter to continue"
 read x
 fi
-sudo mkimage -A arm -T script -C none -d boot.cmd boot.scr || cleanup_and_exit_error
+$SUDO mkimage -A arm -T script -C none -d boot.cmd boot.scr || cleanup_and_exit_error
 )  || cleanup_and_exit_error
 
 echo " "
@@ -557,14 +560,14 @@ echo "Add boot script and device tree to the debian installer image"
 
 DEB_DTB_TARGET_DIR="$BASEDIR/$BUILDDIR/kernel/debian/$KERNEL_IMAGE_DIR/boot"
 
-sudo cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
+$SUDO cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
 pushd $BUILDDIR/kernel/arch/arm/boot/dts || cleanup_and_exit_error
-sudo cp -v $DEVICETREE_CUSTOM_FILES $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
+$SUDO cp -v $DEVICETREE_CUSTOM_FILES $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
 popd
 
 # Copy the target dtb to the fixed name used in the boot.cmd file
 pushd $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
-sudo ln -s $devicetree_file openvario.dtb || cleanup_and_exit_error
+$SUDO ln -s $devicetree_file openvario.dtb || cleanup_and_exit_error
 popd
 
 } # make_u_boot_script ()
@@ -610,22 +613,22 @@ fi
 rm -fv $BUILDDIR/linux-image-$LINUX_VERSION-dbg*.deb
 
 # Clean the boot scripts and device tree. They are now supposed to come with the Debian installer
-sudo rm -vf sdcard/boot/boot.cmd sdcard/boot/boot.scr sdcard/boot/sun7i-a20-cubieboard2.dtb
+$SUDO rm -vf sdcard/boot/boot.cmd sdcard/boot/boot.scr sdcard/boot/sun7i-a20-cubieboard2.dtb
 
-sudo cp -v $BUILDDIR/linux-*$LINUX_VERSION*.deb sdcard
+$SUDO cp -v $BUILDDIR/linux-*$LINUX_VERSION*.deb sdcard
 
-sudo chroot sdcard bin/bash -c "dpkg -i linux-image-$LINUX_VERSION*.deb linux-headers-$LINUX_VERSION*.deb linux-libc-dev_$LINUX_VERSION*.deb" || exit 1
+$SUDO chroot sdcard bin/bash -c "dpkg -i linux-image-$LINUX_VERSION*.deb linux-headers-$LINUX_VERSION*.deb linux-libc-dev_$LINUX_VERSION*.deb" || exit 1
 
 ) || cleanup_and_exit_error  
 
 } # install_kernel_deb ()
 
 select_display_device_tree() {
-    sudo cp build/root/select-display-device-tree.sh sdcard
-    sudo chmod a-x sdcard/select-display-device-tree.sh
-    sudo chmod u+x sdcard/select-display-device-tree.sh
+    $SUDO cp build/root/select-display-device-tree.sh sdcard
+    $SUDO chmod a-x sdcard/select-display-device-tree.sh
+    $SUDO chmod u+x sdcard/select-display-device-tree.sh
 
-    sudo chroot sdcard /select-display-device-tree.sh
+    $SUDO chroot sdcard /select-display-device-tree.sh
 
 } # select_display_device_tree
 
@@ -650,7 +653,7 @@ else
   FIRMWARE_PKG=linux-firmware
 fi
 
-sudo chroot sdcard /bin/bash -c "apt-get -y install $FIRMWARE_PKG" || cleanup_and_exit_error
+LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "apt-get -y install $FIRMWARE_PKG" || cleanup_and_exit_error
 
 } # install_linux_firmware ()
 
@@ -663,12 +666,12 @@ then
 echo "Hit enter to continue"
 read x
 fi
-sudo mkdir -p sdcard/usr/share/doc/horOpenVario
-sudo cp -Rv --preserve=mode,timestamps setup-ubuntu/* sdcard/usr/share/doc/horOpenVario || cleanup_and_exit_error
-# sudo tar -czf sdcard/boot/setup-ubuntu.tgz setup-ubuntu/ || cleanup_and_exit_error
+$SUDO mkdir -p sdcard/usr/share/doc/horOpenVario
+$SUDO cp -Rv --preserve=mode,timestamps setup-ubuntu/* sdcard/usr/share/doc/horOpenVario || cleanup_and_exit_error
+# $SUDO tar -czf sdcard/boot/setup-ubuntu.tgz setup-ubuntu/ || cleanup_and_exit_error
 
 #echo "Copy boot environment ot SD card image"  
-#sudo cp -v build/boot/* sdcard/boot || cleanup_and_exit_error
+#$SUDO cp -v build/boot/* sdcard/boot || cleanup_and_exit_error
 
 } # copy_installation_support ()
 
@@ -685,8 +688,8 @@ then
 echo "Hit enter to continue"
 read x
 fi
-echo "sudo dd if=$BUILDDIR/u-boot/u-boot-sunxi-with-spl.bin of=${LOOPDEV} bs=1024 seek=8"
-sudo dd if=$BUILDDIR/u-boot/u-boot-sunxi-with-spl.bin of=${LOOPDEV} bs=1024 seek=8 || cleanup_and_exit_error
+echo "$SUDO dd if=$BUILDDIR/u-boot/u-boot-sunxi-with-spl.bin of=${LOOPDEV} bs=1024 seek=8"
+$SUDO dd if=$BUILDDIR/u-boot/u-boot-sunxi-with-spl.bin of=${LOOPDEV} bs=1024 seek=8 || cleanup_and_exit_error
 
 fi # if [ $TARGETARCH = armhf ]
 
@@ -721,39 +724,65 @@ echo " build-essential
     libasound2-dev alsaplayer-text alsa-tools alsa-utils
     librsvg2-bin xsltproc
     libinput-dev
-    fonts-dejavu" | sudo tee sdcard/dev-packages.txt > /dev/null
+    fonts-dejavu" | $SUDO tee sdcard/dev-packages.txt > /dev/null
 
-    if test $distris = "hirsute" -o $distris = "impish" -o $distris = "stable" -o $distris = "testing"
+    if test $distris = "noble" -o $distris = "stable" -o $distris = "testing"
     then
-      echo "liblua5.4-dev lua5.4" | sudo tee -a sdcard/dev-packages.txt > /dev/null
+      echo "liblua5.4-dev lua5.4" | $SUDO tee -a sdcard/dev-packages.txt > /dev/null
     fi
 
     
 echo " mesa-common-dev libgles2-mesa-dev libgl1-mesa-dev \
-    libegl1-mesa-dev libgbm-dev" | sudo tee sdcard/mesa-dev-packages.txt > /dev/null
+    libegl1-mesa-dev libgbm-dev" | $SUDO tee sdcard/mesa-dev-packages.txt > /dev/null
     
-echo " "
-echo "Do you want to install the XCSoar build components on your computer,"
-echo "and on the target image? [Y|n]"
-echo "  You can use the installed components on the image also for"
-echo "  cross-compiling XCSoar for the Cubieboard2"
-read x
+if test $NO_PAUSE = 0
+then
+  echo " "
+  echo "Do you want to install the XCSoar build components on your computer,"
+  echo "and on the target image? [Y|n]"
+  echo "  You can use the installed components on the image also for"
+  echo "  cross-compiling XCSoar for the Cubieboard2"
+  read x
+else
+  x=yy
+fi
+
 if [ y$x = yy -o y$x = yY -o y$x = y ]
 then
-  sudo chroot sdcard /bin/bash -c "cat /dev-packages.txt |xargs apt-get -y install" || cleanup_and_exit_error
+  LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "cat /dev-packages.txt |xargs apt-get -y install" || cleanup_and_exit_error
 
-  cat sdcard/dev-packages.txt | xargs sudo apt-get -y install || cleanup_and_exit_error
+  cat sdcard/dev-packages.txt | xargs $SUDO apt-get -y install || cleanup_and_exit_error
   
-  sudo chroot sdcard /bin/bash -c "cat /mesa-dev-packages.txt |xargs apt-get -y install" || cleanup_and_exit_error
+  LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "cat /mesa-dev-packages.txt |xargs apt-get -y install" || cleanup_and_exit_error
 
 # Cross tools are useless on the target machine.
   cat sdcard/mesa-dev-packages.txt | \
-    xargs sudo apt-get -y install crossbuild-essential-armhf || cleanup_and_exit_error
+    LANG=C.UTF-8 LC_ALL=C xargs $SUDO apt-get -y install crossbuild-essential-armhf || cleanup_and_exit_error
 
     # To enable cross compilation fix the symbolic links to the system libraries in /lib/arm-linux-gnueabihf
     fix_lib_symlinks
     
 fi # Do you want to install the XCSoar build components?
+
+echo " "
+echo "Install man pages"
+if test $NO_PAUSE = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+
+LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "apt-get -y install man-db"
+
+echo " "
+echo "Update the installation finally"
+if test $NO_PAUSE = 0
+then
+echo "Hit enter to continue"
+read x
+fi
+LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "apt-get -y update"
+LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
 
 } # install_dev_packages ()
 
@@ -767,14 +796,14 @@ then
 echo "Hit enter to continue"
 read x
 fi
-LANG=C.UTF-8 LC_ALL=C sudo chroot sdcard /bin/bash -c "apt-get -y update"
-LANG=C.UTF-8 LC_ALL=C sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
-LANG=C.UTF-8 LC_ALL=C sudo chroot sdcard /bin/bash -c "apt-get -y install locales keyboard-configuration console-setup"
-LANG=C.UTF-8 LC_ALL=C sudo chroot sdcard /bin/bash -c "dpkg-reconfigure tzdata"
-LANG=C.UTF-8 LC_ALL=C sudo chroot sdcard /bin/bash -c "dpkg-reconfigure locales"
-sudo chroot sdcard /bin/bash -c "dpkg-reconfigure keyboard-configuration"
-sudo chroot sdcard /bin/bash -c "apt-get -y update"
-sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
+LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "apt-get -y update"
+LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
+LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "apt-get -y install locales keyboard-configuration console-setup"
+LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "dpkg-reconfigure tzdata"
+LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "dpkg-reconfigure locales"
+$SUDO chroot sdcard /bin/bash -c "dpkg-reconfigure keyboard-configuration"
+$SUDO chroot sdcard /bin/bash -c "apt-get -y update"
+$SUDO chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
 
 } # config_locale_keyboard ()
 
@@ -814,8 +843,8 @@ do
       if test \( ! -f $l \) -a \( -f $f \)
       then
         echo "Link sdcard/lib/$ARCH_PREFIX/$i to $f"
-        sudo rm -fv $i
-        sudo ln -s $f $i
+        $SUDO rm -fv $i
+        $SUDO ln -s $f $i
       fi  
     fi
   fi
@@ -828,49 +857,39 @@ popd
 finish_installation () {
 
 echo " "
-echo "Install man pages"
-if test $NO_PAUSE = 0
-then
-echo "Hit enter to continue"
-read x
-fi
-
-sudo chroot sdcard /bin/bash -c "apt-get -y install man-db"
-
-echo " "
-echo "Update the installation finally"
-if test $NO_PAUSE = 0
-then
-echo "Hit enter to continue"
-read x
-fi
-sudo chroot sdcard /bin/bash -c "apt-get -y update"
-sudo chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
-
-if test $NO_PAUSE = 0
-then
-echo " "
 echo "--------------  Almost done --------------------"
 echo "Hit enter to continue"
 read x
-fi
+
+echo " "
+echo "Please enter the new root password of the target image"
+$SUDO chroot sdcard /bin/bash -c "passwd root"
+
+
+echo " "
+echo "Please enter the host name of the target computer"
+read x
+# Make the hostname permanent in the hostname file.
+# By default it is set to the name of the build machine.
+echo $x |$SUDO tee sdcard/etc/hostname >/dev/null
 
 echo " "
 echo "Unmount the SD card image"  
 sync
-sudo umount sdcard/sys
-sudo umount sdcard/proc
-sudo umount sdcard/dev/pts
-sudo umount sdcard/dev
-sudo umount sdcard/boot
-sudo umount sdcard
-sudo losetup -d ${LOOPDEV}
+$SUDO umount sdcard/sys
+$SUDO umount sdcard/proc
+$SUDO umount sdcard/dev/pts
+$SUDO umount sdcard/dev
+$SUDO umount sdcard/boot
+$SUDO umount sdcard
+$SUDO losetup -d ${LOOPDEV}
 
 } # finish_installation ()
 
 # ==========================================
 # == Start of the main program =============
 # ==========================================
+
 
 NO_PAUSE=0
 if test x"$1" = "x--no-pause" || test x"$2" = "x--no-pause"
@@ -880,8 +899,25 @@ then
 fi
 
 BASEDIR=`dirname $0`
-BASEDIR="`(cd \"$BASEDIR\" ; BASEDIR=\`pwd\`; echo \"$BASEDIR\")`"
+export BASEDIR="`(cd \"$BASEDIR\" ; BASEDIR=\`pwd\`; echo \"$BASEDIR\")`"
 
+if test $NO_PAUSE = 0
+then
+  export SUDO="sudo "
+else
+  echo " "
+  echo "Please enter your password for fully automatic execution."
+  echo "If you do not enter your password but just Enter"
+  echo "you need to enter your password for \"sudo\" when required in between"
+  read x
+  if [ x$x = x ]
+    export SUDO="sudo "
+  then
+    export SUDO_ASKPASS=$BASEDIR/givepass.sh
+    export SUDO="sudo -A "
+    export MY_PASSWD=$x
+  fi
+fi
 
 echo " "
 echo "BASEDIR = $BASEDIR"
@@ -892,13 +928,13 @@ echo "Selected distribution is $distris"
 echo " "
 
 select_distribution
+ask_apt_cache
 install_build_packages
 create_partition_sd_image
 format_mount_sd_image
 download_base_system_tarball
 install_base_system
 update_base_system
-config_locale_keyboard
 install_complete_base_system
 install_network_management
 rebuild_u_boot
@@ -906,14 +942,14 @@ build_kernel_deb
 make_u_boot_script
 update_kernel_deb_package
 install_kernel_deb
-select_display_device_tree
 install_linux_firmware
 copy_installation_support
 install_u_boot
 install_dev_packages
 load_module sun4i-codec
 load_module lima
-#fi
+config_locale_keyboard
+select_display_device_tree
 finish_installation
 
 echo "Copy the SD card image \"sd.img\" to the SD card raw device"  
