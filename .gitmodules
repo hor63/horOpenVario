@@ -4,7 +4,7 @@
 
 [submodule "src/sunxi-tools"]
 	path = src/sunxi-tools
-	url = git://github.com/linux-sunxi/sunxi-tools.git
+	url = https://github.com/linux-sunxi/sunxi-tools.git
 
 [submodule "src/uboot-mainline"]
 	path = src/uboot-mainline
