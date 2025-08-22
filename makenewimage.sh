@@ -192,8 +192,8 @@ else
 fi
 $SUDO losetup ${LOOPDEV} sd.img || exit 1
 $SUDO partprobe ${LOOPDEV} || cleanup_and_exit_error
-$SUDO mkfs.ext2 -v -F ${LOOPDEV}p1 || cleanup_and_exit_error
-$SUDO mkfs.ext4 -t ext4 -v -F ${LOOPDEV}p2 || cleanup_and_exit_error
+$SUDO mkfs.ext2 -t ext2 -v -F ${LOOPDEV}p1 || cleanup_and_exit_error
+$SUDO mkfs.ext2 -t ext2 -v -F ${LOOPDEV}p2 || cleanup_and_exit_error
 
 mkdir -p sdcard
 
