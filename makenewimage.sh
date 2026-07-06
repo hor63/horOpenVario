@@ -41,9 +41,9 @@ exit 1
 select_distribution () {
 
 # Architecture of the target system
-TARGETARCH=armhf
-ARCH=arm
-ARCH_PREFIX=arm-linux-gnueabihf
+TARGETARCH=amd64
+ARCH=x86_64 
+ARCH_PREFIX=
 BUILDDIR=build
 
 while test -z "$distris"
@@ -153,7 +153,7 @@ read x
 fi
 
 rm -f sd.img || exit 1
-dd if=/dev/zero of=sd.img bs=1M seek=4096 count=0 || exit 1
+dd if=/dev/zero of=sd.img bs=1M seek=4095 count=0 || exit 1
 echo "o
 n
 p
@@ -193,7 +193,7 @@ fi
 $SUDO losetup ${LOOPDEV} sd.img || exit 1
 $SUDO partprobe ${LOOPDEV} || cleanup_and_exit_error
 $SUDO mkfs.ext2 -t ext2 -v -F ${LOOPDEV}p1 || cleanup_and_exit_error
-$SUDO mkfs.ext2 -t ext2 -v -F ${LOOPDEV}p2 || cleanup_and_exit_error
+$SUDO mkfs.ext4 -t ext4 -v -F ${LOOPDEV}p2 || cleanup_and_exit_error
 
 mkdir -p sdcard
 
@@ -345,8 +345,8 @@ echo "# /etc/fstab: static file system information.
 # that works even if disks are added and removed. See fstab(5).
 #
 # <file system> <mount point>   <type>  <options>       <dump>  <pass>
-/dev/mmcblk0p2       /               ext2    defaults,noatime,errors=remount-ro 0       1
-/dev/mmcblk0p1       /boot           ext2    defaults,noatime 0       1
+/dev/sda2      /               ext2    defaults,noatime,errors=remount-ro 0       1
+/dev/sda1       /boot           ext2    defaults,noatime 0       1
 " | $SUDO tee sdcard/etc/fstab
 
 
@@ -536,14 +536,13 @@ fi
 
 ( cd sdcard/boot ; 
 echo "# setenv bootm_boot_mode sec
-setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1
-ext2load mmc 0 0x43000000 openvario.dtb
-# Building the initrd is broken. The kernel boots without initrd just fine.
-# ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
-ext2load mmc 0 0x41000000 vmlinuz-$LINUX_VERSION
+setenv bootargs console=tty0 root=/dev/virtioblk0p2 rootwait consoleblank=0 panic=10
+#ext2load virtio 0 0x13000000 openvario.dtb
+ext2load virtio 0 0x14000000 initrd.img-$LINUX_VERSION
+ext2load virtio 0 0x11000000 vmlinuz-$LINUX_VERSION
 # Skip the initrd in the boot command.
 # bootz 0x41000000 0x44000000 0x43000000
-bootz 0x41000000 - 0x43000000" |$SUDO tee boot.cmd || exit 1
+booti 0x11000000" |$SUDO tee boot.cmd || exit 1
 
 echo " "
 echo "Make boot script boot.scr from boot.cmd"
@@ -552,7 +551,7 @@ then
 echo "Hit enter to continue"
 read x
 fi
-$SUDO mkimage -A arm -T script -C none -d boot.cmd boot.scr || cleanup_and_exit_error
+$SUDO mkimage -A x86_64 -T script -C none -d boot.cmd boot.scr || cleanup_and_exit_error
 )  || cleanup_and_exit_error
 
 echo " "
@@ -561,9 +560,12 @@ echo "Add boot script and device tree to the debian installer image"
 DEB_DTB_TARGET_DIR="$BASEDIR/$BUILDDIR/kernel/debian/$KERNEL_IMAGE_DIR/boot"
 
 $SUDO cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
-pushd $BUILDDIR/kernel/arch/arm/boot/dts || cleanup_and_exit_error
-$SUDO cp -v $DEVICETREE_CUSTOM_FILES $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
-popd
+if [ $TARGETARCH = armhf ]
+then
+  pushd $BUILDDIR/kernel/arch/arm/boot/dts || cleanup_and_exit_error
+  $SUDO cp -v $DEVICETREE_CUSTOM_FILES $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
+  popd
+fi # if [ $TARGETARCH = armhf ]
 
 # Copy the target dtb to the fixed name used in the boot.cmd file
 pushd $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
@@ -681,13 +683,13 @@ install_u_boot () {
 if [ $TARGETARCH = armhf ]
 then
 
-echo " "
-echo "Copy U-Boot to the SD image"
-if test $NO_PAUSE = 0
-then
-echo "Hit enter to continue"
-read x
-fi
+  echo " "
+  echo "Copy U-Boot to the SD image"
+  if test $NO_PAUSE = 0
+  then
+  echo "Hit enter to continue"
+  read x
+fi # 
 echo "$SUDO dd if=$BUILDDIR/u-boot/u-boot-sunxi-with-spl.bin of=${LOOPDEV} bs=1024 seek=8"
 $SUDO dd if=$BUILDDIR/u-boot/u-boot-sunxi-with-spl.bin of=${LOOPDEV} bs=1024 seek=8 || cleanup_and_exit_error
 
@@ -760,7 +762,10 @@ then
     LANG=C.UTF-8 LC_ALL=C xargs $SUDO apt-get -y install crossbuild-essential-armhf || cleanup_and_exit_error
 
     # To enable cross compilation fix the symbolic links to the system libraries in /lib/arm-linux-gnueabihf
-    fix_lib_symlinks
+    if [ $TARGETARCH = armhf ]
+    then
+      fix_lib_symlinks
+    fi
     
 fi # Do you want to install the XCSoar build components?
 
@@ -812,7 +817,7 @@ $SUDO chroot sdcard /bin/bash -c "apt-get -y dist-upgrade"
 # to /lib/... instead of a relative symbolic link in the same directory.
 # This prevents gcc with the option --with-sysroot to find the library in the cross-build root file system.
 
-# Therefore fix these symbolic links by replacing them with relative szmbolic links.
+# Therefore fix these symbolic links by replacing them with relative symbolic links.
 fix_lib_symlinks () {
 
 SYS_LIB_DIR=`pwd`/sdcard/lib/$ARCH_PREFIX

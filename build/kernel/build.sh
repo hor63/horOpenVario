@@ -6,6 +6,6 @@ echo " O = $O"
 export O
 
 (cd "$O/../../src/kernel"
-make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- O="$O" $*
+make O="$O" $*
 )
 
