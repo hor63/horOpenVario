@@ -6,6 +6,6 @@ echo " O = $O"
 export O
 
 (cd "$O/../../src/uboot-mainline"
-make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- O="$O" $*
+make  O="$O" $*
 )
 
