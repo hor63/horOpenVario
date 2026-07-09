@@ -726,16 +726,25 @@ echo " build-essential
     libasound2-dev alsaplayer-text alsa-tools alsa-utils
     librsvg2-bin xsltproc
     libinput-dev
-    fonts-dejavu" | $SUDO tee sdcard/dev-packages.txt > /dev/null
+    fonts-dejavu
+    mesa-common-dev libgles2-mesa-dev libgl1-mesa-dev 
+    libegl1-mesa-dev libgbm-dev
+    libdbus-1-dev
+    libfmt-dev
+    sox
+    libsdl2-dev
+    libpango1.0-dev
+    cmake
+    libwayland-dev
+    libwayland-egl-backend-dev
+    gdb
+    fonts-noto
+    libgettextpo-dev" | $SUDO tee sdcard/dev-packages.txt > /dev/null
 
     if test $distris = "noble" -o $distris = "stable" -o $distris = "testing"
     then
       echo "liblua5.4-dev lua5.4" | $SUDO tee -a sdcard/dev-packages.txt > /dev/null
     fi
-
-    
-echo " mesa-common-dev libgles2-mesa-dev libgl1-mesa-dev \
-    libegl1-mesa-dev libgbm-dev" | $SUDO tee sdcard/mesa-dev-packages.txt > /dev/null
     
 if test $NO_PAUSE = 0
 then
@@ -758,9 +767,6 @@ then
   LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "cat /mesa-dev-packages.txt |xargs apt-get -y install" || cleanup_and_exit_error
 
 # Cross tools are useless on the target machine.
-  cat sdcard/mesa-dev-packages.txt | \
-    LANG=C.UTF-8 LC_ALL=C xargs $SUDO apt-get -y install crossbuild-essential-armhf || cleanup_and_exit_error
-
     # To enable cross compilation fix the symbolic links to the system libraries in /lib/arm-linux-gnueabihf
     if [ $TARGETARCH = armhf ]
     then
@@ -925,6 +931,17 @@ else
 fi
 
 echo " "
+echo "Do you want to install the system into a disk image? [Yn]"
+echo "If you say yes the disk image will be ./sd.img"
+read x
+if [ "x$x" = x ] || [ "x$x" = y ] || [ "x$x" = Y ]
+then
+  USE_DISK_IMAGE=y
+else
+  USE_DISK_IMAGE=n
+fi
+
+echo " "
 echo "BASEDIR = $BASEDIR"
 export BASEDIR
 cd $BASEDIR
@@ -935,21 +952,39 @@ echo " "
 select_distribution
 ask_apt_cache
 install_build_packages
-create_partition_sd_image
-format_mount_sd_image
+if [ $USE_DISK_IMAGE = y ]
+then
+  ./umountSDImage.sh
+  create_partition_sd_image
+  format_mount_sd_image
+else
+  echo "Re-create subdirectory sdcard."
+  ./umountSDImage.sh
+  $SUDO rm -rf sdcard
+  $SUDO mkdir sdcard
+fi
 download_base_system_tarball
 install_base_system
 update_base_system
 install_complete_base_system
 install_network_management
-rebuild_u_boot
+if [ $USE_DISK_IMAGE = y ]
+then
+  rebuild_u_boot
+fi
 build_kernel_deb
-make_u_boot_script
+if [ $USE_DISK_IMAGE = y ]
+then
+  make_u_boot_script
+fi
 update_kernel_deb_package
 install_kernel_deb
 install_linux_firmware
 copy_installation_support
-install_u_boot
+if [ $USE_DISK_IMAGE = y ]
+then
+  install_u_boot
+fi
 install_dev_packages
 load_module sun4i-codec
 load_module lima
