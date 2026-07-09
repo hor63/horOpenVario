@@ -724,16 +724,26 @@ echo " build-essential
     libasound2-dev alsaplayer-text alsa-tools alsa-utils
     librsvg2-bin xsltproc
     libinput-dev
-    fonts-dejavu" | $SUDO tee sdcard/dev-packages.txt > /dev/null
+    fonts-dejavu
+    mesa-common-dev libgles2-mesa-dev libgl1-mesa-dev 
+    libegl1-mesa-dev libgbm-dev
+    libdbus-1-dev
+    libfmt-dev
+    sox
+    libsdl2-dev
+    libpango1.0-dev
+    cmake
+    libwayland-dev
+    libwayland-egl-backend-dev
+    gdb
+    fonts-noto
+    libgettextpo-dev" | $SUDO tee sdcard/dev-packages.txt > /dev/null
 
     if test $distris = "noble" -o $distris = "stable" -o $distris = "testing"
     then
       echo "liblua5.4-dev lua5.4" | $SUDO tee -a sdcard/dev-packages.txt > /dev/null
     fi
 
-    
-echo " mesa-common-dev libgles2-mesa-dev libgl1-mesa-dev \
-    libegl1-mesa-dev libgbm-dev" | $SUDO tee sdcard/mesa-dev-packages.txt > /dev/null
     
 if test $NO_PAUSE = 0
 then
