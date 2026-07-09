@@ -17,18 +17,8 @@
 #    with this program; if not, write to the Free Software Foundation, Inc.,
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-echo "Unmount the SD card image"  
-sync
-
-sudo umount -v -R -f sdcard/run
-sudo umount -v -R -f sdcard/sys
-sudo umount -v -R -f sdcard/proc
-sudo umount -v -R -f sdcard/dev
-sudo umount sdcard/boot
-sudo umount sdcard
-sudo losetup --list |fgrep /sd.img |while read i k
-do
-  echo "Detach loopback device $i"
-  sudo losetup -d $i
-done
-
+# Mount the dynamic kernel managed file systems for a pleasant CHROOT experience
+sudo mount -v --rbind /sys sdcard/sys
+sudo mount -v --rbind /proc sdcard/proc
+sudo mount -v --rbind /dev sdcard/dev
+sudo mount -v --rbind /run sdcard/run

@@ -34,7 +34,7 @@ sudo mount -v -o defaults,noatime ${LOOPDEV}p1 sdcard/boot
 sync
 
 # Mount the dynamic kernel managed file systems for a pleasant CHROOT experience
-sudo mount -v -t sysfs sysfs sdcard/sys
-sudo mount -v -t proc proc sdcard/proc
-sudo mount -v -t devtmpfs udev sdcard/dev
-sudo mount -v -t devpts devpts sdcard/dev/pts
+sudo mount -v --rbind /sys sdcard/sys
+sudo mount -v --rbind /proc sdcard/proc
+sudo mount -v --rbind /dev sdcard/dev
+sudo mount -v --rbind /run sdcard/run
