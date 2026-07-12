@@ -40,11 +40,6 @@ exit 1
 # ===================================================
 select_distribution () {
 
-# Architecture of the target system
-TARGETARCH=armhf
-ARCH=arm
-ARCH_PREFIX=arm-linux-gnueabihf
-BUILDDIR=build
 
 while test -z "$distris"
 do
@@ -193,7 +188,7 @@ fi
 $SUDO losetup ${LOOPDEV} sd.img || exit 1
 $SUDO partprobe ${LOOPDEV} || cleanup_and_exit_error
 $SUDO mkfs.ext2 -t ext2 -v -F ${LOOPDEV}p1 || cleanup_and_exit_error
-$SUDO mkfs.ext2 -t ext2 -v -F ${LOOPDEV}p2 || cleanup_and_exit_error
+$SUDO mkfs.ext4 -t ext4 -v -F ${LOOPDEV}p2 || cleanup_and_exit_error
 
 mkdir -p sdcard
 
@@ -536,14 +531,16 @@ fi
 
 ( cd sdcard/boot ; 
 echo "# setenv bootm_boot_mode sec
-setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10 drm_kms_helper.drm_leak_fbdev_smem=1
-ext2load mmc 0 0x43000000 openvario.dtb
+setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10
+ext2load mmc 0 0x41000000 openvario.dtb
 # Building the initrd is broken. The kernel boots without initrd just fine.
 # ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
-ext2load mmc 0 0x41000000 vmlinuz-$LINUX_VERSION
+ext2load mmc 0 0x42000000 vmlinuz-$LINUX_VERSION
 # Skip the initrd in the boot command.
 # bootz 0x41000000 0x44000000 0x43000000
-bootz 0x41000000 - 0x43000000" |$SUDO tee boot.cmd || exit 1
+echo bootargs = ${bootargs}
+pause
+bootz 0x42000000 - 0x41000000" |$SUDO tee boot.cmd || exit 1
 
 echo " "
 echo "Make boot script boot.scr from boot.cmd"
@@ -933,6 +930,12 @@ echo " "
 echo "BASEDIR = $BASEDIR"
 export BASEDIR
 cd $BASEDIR
+
+# Architecture of the target system
+TARGETARCH=armhf
+ARCH=arm
+ARCH_PREFIX=arm-linux-gnueabihf
+BUILDDIR=build
 
 echo "Selected distribution is $distris"
 echo " "
