@@ -27,3 +27,4 @@ libssl-dev
 quilt
 swig
 avahi-daemon avahi-discover libnss-mdns
+libgnutls28-dev
