@@ -148,7 +148,7 @@ read x
 fi
 
 rm -f sd.img || exit 1
-dd if=/dev/zero of=sd.img bs=1M seek=4096 count=0 || exit 1
+dd if=/dev/zero of=sd.img bs=1M seek=8192 count=0 || exit 1
 echo "o
 n
 p
@@ -530,15 +530,14 @@ read x
 fi
 
 ( cd sdcard/boot ; 
-echo "# setenv bootm_boot_mode sec
-setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10
+echo "setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10
 ext2load mmc 0 0x41000000 openvario.dtb
-# Building the initrd is broken. The kernel boots without initrd just fine.
+# The kernel boots without initrd just fine.
 # ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
 ext2load mmc 0 0x42000000 vmlinuz-$LINUX_VERSION
 # Skip the initrd in the boot command.
-# bootz 0x41000000 0x44000000 0x43000000
-echo bootargs = ${bootargs}
+# bootz 0x42000000 0x44000000 0x41000000
+echo bootargs = \${bootargs}
 pause
 bootz 0x42000000 - 0x41000000" |$SUDO tee boot.cmd || exit 1
 
@@ -553,17 +552,14 @@ $SUDO mkimage -A arm -T script -C none -d boot.cmd boot.scr || cleanup_and_exit_
 )  || cleanup_and_exit_error
 
 echo " "
-echo "Add boot script and device tree to the debian installer image"
+echo "Add boot script and device tree to the boot file system"
 
-DEB_DTB_TARGET_DIR="$BASEDIR/$BUILDDIR/kernel/debian/$KERNEL_IMAGE_DIR/boot"
-
-$SUDO cp -v sdcard/boot/boot.cmd sdcard/boot/boot.scr $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
-pushd $BUILDDIR/kernel/arch/arm/boot/dts || cleanup_and_exit_error
-$SUDO cp -v $DEVICETREE_CUSTOM_FILES $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
+pushd build/kernel/arch/arm/boot/dts || cleanup_and_exit_error
+$SUDO cp -v $DEVICETREE_CUSTOM_FILES $BASEDIR/sdcard/boot || cleanup_and_exit_error
 popd
 
-# Copy the target dtb to the fixed name used in the boot.cmd file
-pushd $DEB_DTB_TARGET_DIR || cleanup_and_exit_error
+# Link the target dtb to the fixed name used in the boot.cmd file
+pushd sdcard/boot || cleanup_and_exit_error
 $SUDO ln -s $devicetree_file openvario.dtb || cleanup_and_exit_error
 popd
 
@@ -608,9 +604,6 @@ fi
 
 # delete the debug kernel images when they exist
 rm -fv $BUILDDIR/linux-image-$LINUX_VERSION-dbg*.deb
-
-# Clean the boot scripts and device tree. They are now supposed to come with the Debian installer
-$SUDO rm -vf sdcard/boot/boot.cmd sdcard/boot/boot.scr sdcard/boot/sun7i-a20-cubieboard2.dtb
 
 $SUDO cp -v $BUILDDIR/linux-*$LINUX_VERSION*.deb sdcard
 
@@ -711,7 +704,7 @@ echo " build-essential
     fakeroot
     zlib1g-dev
     libsodium-dev
-    libfreetype6-dev
+    libfreetype-dev
     libpng-dev libjpeg-dev
     libtiff5-dev libgeotiff-dev
     libcurl4-openssl-dev
@@ -722,6 +715,7 @@ echo " build-essential
     librsvg2-bin xsltproc
     libinput-dev
     fonts-dejavu
+    libdrm-dev
     mesa-common-dev libgles2-mesa-dev libgl1-mesa-dev 
     libegl1-mesa-dev libgbm-dev
     libdbus-1-dev
@@ -734,7 +728,9 @@ echo " build-essential
     libwayland-egl-backend-dev
     gdb
     fonts-noto
-    libgettextpo-dev" | $SUDO tee sdcard/dev-packages.txt > /dev/null
+    libgettextpo-dev
+    liblog4cxx-dev
+    libpulse-dev" | $SUDO tee sdcard/dev-packages.txt > /dev/null
 
     if test $distris = "noble" -o $distris = "stable" -o $distris = "testing"
     then
@@ -756,18 +752,15 @@ fi
 
 if [ y$x = yy -o y$x = yY -o y$x = y ]
 then
-  LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "cat /dev-packages.txt |xargs apt-get -y install" || cleanup_and_exit_error
+  LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c 'apt-get -y install `cat /dev-packages.txt`' || cleanup_and_exit_error
 
-  cat sdcard/dev-packages.txt | xargs $SUDO apt-get -y install || cleanup_and_exit_error
-  
-  LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "cat /mesa-dev-packages.txt |xargs apt-get -y install" || cleanup_and_exit_error
+  $SUDO apt-get -y install `cat sdcard/dev-packages.txt` || cleanup_and_exit_error
 
 # Cross tools are useless on the target machine.
-  cat sdcard/mesa-dev-packages.txt | \
-    LANG=C.UTF-8 LC_ALL=C xargs $SUDO apt-get -y install crossbuild-essential-armhf || cleanup_and_exit_error
+  LANG=C.UTF-8 LC_ALL=C xargs $SUDO apt-get -y install crossbuild-essential-armhf || cleanup_and_exit_error
 
-    # To enable cross compilation fix the symbolic links to the system libraries in /lib/arm-linux-gnueabihf
-    fix_lib_symlinks
+  # To enable cross compilation fix the symbolic links to the system libraries in /lib/arm-linux-gnueabihf
+  fix_lib_symlinks
     
 fi # Do you want to install the XCSoar build components?
 
@@ -953,7 +946,7 @@ install_network_management
 rebuild_u_boot
 build_kernel_deb
 make_u_boot_script
-update_kernel_deb_package
+# update_kernel_deb_package
 install_kernel_deb
 install_linux_firmware
 copy_installation_support
