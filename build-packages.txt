@@ -10,7 +10,6 @@ python2
 libpython2-dev
 python3
 python3-pkg-resources
-python3-distutils
 libpython3-dev
 python-is-python3
 initramfs-tools
