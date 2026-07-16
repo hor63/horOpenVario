@@ -533,13 +533,13 @@ fi
 echo "setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10
 ext2load mmc 0 0x41000000 openvario.dtb
 # The kernel boots without initrd just fine.
-# ext2load mmc 0 0x44000000 initrd.img-$LINUX_VERSION
-ext2load mmc 0 0x42000000 vmlinuz-$LINUX_VERSION
+# ext2load mmc 0 0x54000000 initrd.img-$LINUX_VERSION
+ext2load mmc 0 0x44000000 vmlinuz-$LINUX_VERSION
 # Skip the initrd in the boot command.
-# bootz 0x42000000 0x44000000 0x41000000
 echo bootargs = \${bootargs}
-pause
-bootz 0x42000000 - 0x41000000" |$SUDO tee boot.cmd || exit 1
+# pause
+#bootz 0x44000000 0x54000000:0xa00000 0x41000000
+bootz 0x44000000 - 0x41000000" |$SUDO tee boot.cmd || exit 1
 
 echo " "
 echo "Make boot script boot.scr from boot.cmd"
