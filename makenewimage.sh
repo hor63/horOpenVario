@@ -730,7 +730,8 @@ echo " build-essential
     fonts-noto
     libgettextpo-dev
     liblog4cxx-dev
-    libpulse-dev" | $SUDO tee sdcard/dev-packages.txt > /dev/null
+    libpulse-dev
+    libnetcdf-dev" | $SUDO tee sdcard/dev-packages.txt > /dev/null
 
     if test $distris = "noble" -o $distris = "stable" -o $distris = "testing"
     then
