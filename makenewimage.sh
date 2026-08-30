@@ -364,7 +364,7 @@ LANG=C.UTF-8 LC_ALL=C $SUDO chroot sdcard /bin/bash -c "apt-get -y install\
     avahi-daemon avahi-utils libnss-mdns parted fdisk \
     nfs-common \
     net-tools ifupdown \
-    openssh-server \
+    openssh-server ssh \
     libssl-dev \
     bluetooth \
     sudo" || cleanup_and_exit_error
