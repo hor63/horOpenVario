@@ -340,7 +340,7 @@ echo "# /etc/fstab: static file system information.
 # that works even if disks are added and removed. See fstab(5).
 #
 # <file system> <mount point>   <type>  <options>       <dump>  <pass>
-/dev/mmcblk0p2       /               ext2    defaults,noatime,errors=remount-ro 0       1
+/dev/mmcblk0p2       /               ext2    defaults,noatime,errors=remount-ro,acl,user_xattr 0       1
 /dev/mmcblk0p1       /boot           ext2    defaults,noatime 0       1
 " | $SUDO tee sdcard/etc/fstab
 
@@ -530,7 +530,7 @@ read x
 fi
 
 ( cd sdcard/boot ; 
-echo "setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10
+echo "setenv bootargs console=tty0 root=/dev/mmcblk0p2 rootwait consoleblank=0 panic=10 fsck.mode=auto fsck.repair=yes apparmor=1 security=apparmor
 ext2load mmc 0 0x41000000 openvario.dtb
 # The kernel boots without initrd just fine.
 # ext2load mmc 0 0x54000000 initrd.img-$LINUX_VERSION
