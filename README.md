@@ -1,6 +1,6 @@
 *This file is part of horOV*
 
-*Copyright (C) 2017-2022  Kai Horstmann*
+*Copyright (C) 2017-2026  Kai Horstmann*
 
 # Open Vario on Cubieboard 2 running Ubuntu or Debian
 ## horOV
